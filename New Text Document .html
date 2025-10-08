@@ -1,0 +1,3441 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة مديونية العملاء - فرع الساحل</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+    <meta name="description" content="نظام إدارة مديونية العملاء - فرع الساحل. نظام شامل لإدارة ومتابعة المديونيات والمدفوعات">
+    <meta name="keywords" content="مديونية, عملاء, إدارة, محاسبة, فواتير">
+    <meta name="author" content="Minavir">
+    <style>
+        body {
+            box-sizing: border-box;
+            font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .success-animation {
+            animation: successPulse 0.6s ease-out;
+        }
+        
+        @keyframes successPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .offline-indicator {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: #f39c12;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .online-indicator {
+            background: #27ae60;
+        }
+        
+        .backup-reminder {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            background: #e74c3c;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+            max-width: 300px;
+        }
+        
+        @media (max-width: 768px) {
+            .backup-reminder {
+                bottom: 80px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Connection Status Indicator -->
+    <div id="connectionStatus" class="offline-indicator">
+        🌐 غير متصل بالإنترنت
+    </div>
+
+    <!-- Backup Reminder -->
+    <div id="backupReminder" class="backup-reminder">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="font-semibold">⚠️ تذكير النسخ الاحتياطي</p>
+                <p class="text-sm">آخر نسخة احتياطية منذ أكثر من 7 أيام</p>
+            </div>
+            <button onclick="hideBackupReminder()" class="text-white hover:text-gray-200 ml-2">✕</button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6 shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4 space-x-reverse">
+                    <div class="text-4xl">💰</div>
+                    <div>
+                        <h1 class="text-3xl font-bold">نظام إدارة مديونية العملاء</h1>
+                        <p class="text-blue-100">فرع الساحل - الإصدار 7.1</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-blue-100">آخر تحديث للبيانات</p>
+                    <p id="lastUpdate" class="text-lg font-semibold">--</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Personal Summary -->
+    <section class="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-8">
+        <div class="container mx-auto px-4">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <span class="ml-2">📊</span>
+                الملخص الشخصي
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white bg-opacity-20 rounded-lg p-6 text-center">
+                    <div class="text-4xl mb-3">💰</div>
+                    <h3 class="text-xl font-semibold mb-2">المطلوب مني (مديونية)</h3>
+                    <p id="totalOwed" class="text-4xl font-bold">0 جنيه</p>
+                    <p class="text-sm opacity-80 mt-2">إجمالي ما عليك من مديونيات</p>
+                </div>
+                <div class="bg-white bg-opacity-20 rounded-lg p-6 text-center">
+                    <div class="text-4xl mb-3">💵</div>
+                    <h3 class="text-xl font-semibold mb-2">المطلوب لي (مستحقات)</h3>
+                    <p id="totalDue" class="text-4xl font-bold">0 جنيه</p>
+                    <p class="text-sm opacity-80 mt-2">إجمالي ما لك عند العملاء</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Statistics Cards -->
+    <section class="py-8">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-white rounded-xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
+                    <div class="text-4xl mb-3">👥</div>
+                    <h3 class="text-lg font-semibold text-gray-700">إجمالي العملاء</h3>
+                    <p id="totalCustomers" class="text-3xl font-bold text-blue-600">0</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
+                    <div class="text-4xl mb-3">💸</div>
+                    <h3 class="text-lg font-semibold text-gray-700">إجمالي المديونية</h3>
+                    <p id="totalDebt" class="text-3xl font-bold text-red-600">0 جنيه</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
+                    <div class="text-4xl mb-3">💚</div>
+                    <h3 class="text-lg font-semibold text-gray-700">إجمالي المدفوع</h3>
+                    <p id="totalPaid" class="text-3xl font-bold text-green-600">0 جنيه</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-lg p-6 text-center hover:shadow-xl transition-shadow">
+                    <div class="text-4xl mb-3">⚠️</div>
+                    <h3 class="text-lg font-semibold text-gray-700">عملاء مديونين</h3>
+                    <p id="debtorCount" class="text-3xl font-bold text-orange-600">0</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Add New Customer Form -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <span class="ml-2">👤</span>
+                    تسجيل عميل جديد
+                </h2>
+                
+                <form id="customerForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">كود العميل *</label>
+                        <input type="text" id="newCustomerCode" required 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="مثال: C001">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">اسم العميل *</label>
+                        <input type="text" id="newCustomerName" required 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="أدخل اسم العميل">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">رقم الهاتف</label>
+                        <input type="tel" id="newCustomerPhone" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="رقم الهاتف (اختياري)">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">العنوان</label>
+                        <textarea id="newCustomerAddress" rows="2"
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="العنوان (اختياري)"></textarea>
+                    </div>
+                    
+                    <button type="submit" 
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 transform hover:scale-105">
+                        ✅ تسجيل العميل
+                    </button>
+                </form>
+            </div>
+
+            <!-- Add Transaction Form -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <span class="ml-2">📝</span>
+                    إضافة معاملة جديدة
+                </h2>
+                
+                <form id="transactionForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">كود العميل *</label>
+                        <div class="relative">
+                            <input type="text" id="customerCode" required 
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="أدخل كود العميل">
+                            <div id="customerInfo" class="mt-2 p-3 bg-gray-50 rounded hidden">
+                                <p id="customerDetails" class="text-sm text-gray-700"></p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">نوع المعاملة *</label>
+                        <select id="transactionType" required 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">اختر نوع المعاملة</option>
+                            <option value="debt">مديونية جديدة</option>
+                            <option value="payment">دفعة</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">المبلغ (جنيه) *</label>
+                        <input type="number" id="amount" required min="0" step="0.01"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="أدخل المبلغ">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">وصف المعاملة</label>
+                        <textarea id="description" rows="3"
+                                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="تفاصيل المعاملة (اختياري)"></textarea>
+                    </div>
+                    
+                    <button type="submit" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 transform hover:scale-105">
+                        ✅ إضافة المعاملة
+                    </button>
+                </form>
+            </div>
+
+            <!-- Customer Search and Tools -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <span class="ml-2">🔍</span>
+                    البحث والأدوات
+                </h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">البحث بكود العميل</label>
+                        <div class="relative">
+                            <input type="text" id="quickSearchCode" 
+                                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                   placeholder="أدخل كود العميل للبحث السريع">
+                            <button onclick="quickSearch()" 
+                                    class="absolute left-2 top-1/2 transform -translate-y-1/2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                                🔍
+                            </button>
+                        </div>
+                        <div id="quickSearchResult" class="mt-2 hidden"></div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">البحث العام</label>
+                        <input type="text" id="searchCustomer" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                               placeholder="ابحث بالكود أو الاسم">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">فلترة حسب الحالة</label>
+                        <select id="statusFilter" 
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="all">جميع العملاء</option>
+                            <option value="debtors">العملاء المديونين فقط</option>
+                            <option value="cleared">العملاء المسددين</option>
+                        </select>
+                    </div>
+                    
+                    <div class="space-y-3 pt-4 border-t">
+                        <button onclick="createBackup()" 
+                                class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                            💾 إنشاء نسخة احتياطية
+                        </button>
+                        
+                        <button onclick="exportToExcel()" 
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                            📊 تصدير إلى Excel
+                        </button>
+                        
+                        <div class="border-t pt-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">استيراد من Excel</label>
+                            <input type="file" id="excelFile" accept=".xlsx,.xls" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <button onclick="importFromExcel()" 
+                                    class="w-full mt-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                                📥 استيراد البيانات
+                            </button>
+                        </div>
+                        
+                        <button onclick="downloadTemplate()" 
+                                class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 text-sm">
+                            📋 تحميل نموذج Excel
+                        </button>
+                        
+                        <div class="border-t pt-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">استعادة نسخة احتياطية</label>
+                            <input type="file" id="backupFile" accept=".json" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <button onclick="restoreBackup()" 
+                                    class="w-full mt-2 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                                📂 استعادة النسخة الاحتياطية
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Controls -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                <span class="ml-2">📋</span>
+                عرض البيانات
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="showCustomersPage()" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-lg transition duration-200 transform hover:scale-105 flex items-center justify-center">
+                    <span class="ml-2">👥</span>
+                    إدارة قائمة العملاء
+                </button>
+                
+                <button onclick="printCurrentReport()" 
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg transition duration-200 transform hover:scale-105 flex items-center justify-center">
+                    <span class="ml-2">🖨️</span>
+                    طباعة التقرير الحالي
+                </button>
+            </div>
+        </div>
+
+        <!-- Customers List -->
+        <div class="mt-8 bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                <span class="ml-2">👥</span>
+                قائمة العملاء
+            </h2>
+            <div id="customersList" class="space-y-4">
+                <!-- Customers will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div class="mt-8 space-y-8">
+            <!-- General Monthly Report -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <span class="ml-2">📊</span>
+                    التقرير الشهري العام
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <select id="reportMonth" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="1">يناير</option>
+                        <option value="2">فبراير</option>
+                        <option value="3">مارس</option>
+                        <option value="4">أبريل</option>
+                        <option value="5">مايو</option>
+                        <option value="6">يونيو</option>
+                        <option value="7">يوليو</option>
+                        <option value="8">أغسطس</option>
+                        <option value="9">سبتمبر</option>
+                        <option value="10">أكتوبر</option>
+                        <option value="11">نوفمبر</option>
+                        <option value="12">ديسمبر</option>
+                    </select>
+                    
+                    <select id="reportYear" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <!-- Years will be populated by JavaScript -->
+                    </select>
+                    
+                    <button onclick="generateMonthlyReport()" 
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        📊 إنشاء التقرير
+                    </button>
+                    
+                    <button onclick="printMonthlyReport()" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        🖨️ طباعة التقرير
+                    </button>
+                </div>
+                
+                <div id="monthlyReportContent">
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="text-4xl mb-4">📈</div>
+                        <p>اختر الشهر والسنة لإنشاء التقرير</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Individual Customer Reports -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <span class="ml-2">👤</span>
+                    تقارير العملاء الفردية
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <select id="customerReportCode" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">اختر العميل</option>
+                        <!-- Customers will be populated by JavaScript -->
+                    </select>
+                    
+                    <select id="customerReportType" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="monthly">تقرير شهري</option>
+                        <option value="yearly">تقرير سنوي</option>
+                        <option value="full">تقرير شامل</option>
+                    </select>
+                    
+                    <select id="customerReportMonth" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="1">يناير</option>
+                        <option value="2">فبراير</option>
+                        <option value="3">مارس</option>
+                        <option value="4">أبريل</option>
+                        <option value="5">مايو</option>
+                        <option value="6">يونيو</option>
+                        <option value="7">يوليو</option>
+                        <option value="8">أغسطس</option>
+                        <option value="9">سبتمبر</option>
+                        <option value="10">أكتوبر</option>
+                        <option value="11">نوفمبر</option>
+                        <option value="12">ديسمبر</option>
+                    </select>
+                    
+                    <select id="customerReportYear" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <!-- Years will be populated by JavaScript -->
+                    </select>
+                    
+                    <button onclick="generateCustomerReport()" 
+                            class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        📋 إنشاء التقرير
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <button onclick="printCustomerReport()" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                        <span class="ml-2">🖨️</span>
+                        طباعة تقرير العميل
+                    </button>
+                    
+                    <button onclick="exportCustomerReport()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                        <span class="ml-2">📊</span>
+                        تصدير إلى Excel
+                    </button>
+                    
+                    <button onclick="emailCustomerReport()" 
+                            class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                        <span class="ml-2">📧</span>
+                        إرسال بالإيميل
+                    </button>
+                </div>
+                
+                <div id="customerReportContent">
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="text-4xl mb-4">👤</div>
+                        <p>اختر العميل ونوع التقرير لإنشاء تقرير مفصل</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Customers Management Page (Hidden by default) -->
+    <div id="customersPage" class="fixed inset-0 bg-white z-50 hidden overflow-y-auto">
+        <div class="container mx-auto px-4 py-6">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl p-6 mb-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold flex items-center">
+                            <span class="ml-3">👥</span>
+                            إدارة قائمة العملاء
+                        </h1>
+                        <p class="text-blue-100 mt-2">إدارة شاملة لجميع العملاء مع إمكانية التحديد والحذف المتعدد</p>
+                    </div>
+                    <button onclick="hideCustomersPage()" 
+                            class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-6 py-3 rounded-lg transition duration-200 flex items-center">
+                        <span class="ml-2">🏠</span>
+                        العودة للرئيسية
+                    </button>
+                </div>
+            </div>
+
+            <!-- Controls Section -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <!-- Search -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">البحث</label>
+                        <input type="text" id="customersPageSearch" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                               placeholder="ابحث بالكود أو الاسم">
+                    </div>
+                    
+                    <!-- Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">فلترة</label>
+                        <select id="customersPageFilter" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="all">جميع العملاء</option>
+                            <option value="debtors">العملاء المديونين فقط</option>
+                            <option value="cleared">العملاء المسددين</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Sort -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">ترتيب حسب</label>
+                        <select id="customersPageSort" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="name">الاسم</option>
+                            <option value="code">الكود</option>
+                            <option value="balance">الرصيد</option>
+                            <option value="date">تاريخ التسجيل</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap gap-3 items-center justify-between border-t pt-4">
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="selectAllCustomers()" 
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
+                            <span class="ml-2">☑️</span>
+                            تحديد الكل
+                        </button>
+                        
+                        <button onclick="deselectAllCustomers()" 
+                                class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
+                            <span class="ml-2">⬜</span>
+                            إلغاء التحديد
+                        </button>
+                        
+                        <button onclick="deleteSelectedCustomers()" 
+                                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
+                            <span class="ml-2">🗑️</span>
+                            حذف المحدد (<span id="selectedCount">0</span>)
+                        </button>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="exportSelectedCustomers()" 
+                                class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
+                            <span class="ml-2">📊</span>
+                            تصدير المحدد
+                        </button>
+                        
+                        <button onclick="printSelectedCustomers()" 
+                                class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center">
+                            <span class="ml-2">🖨️</span>
+                            طباعة المحدد
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <div class="text-2xl mb-2">👥</div>
+                    <p class="text-sm text-gray-600">إجمالي العملاء</p>
+                    <p id="customersPageTotalCount" class="text-xl font-bold text-blue-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <div class="text-2xl mb-2">⚠️</div>
+                    <p class="text-sm text-gray-600">العملاء المديونين</p>
+                    <p id="customersPageDebtorCount" class="text-xl font-bold text-red-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <div class="text-2xl mb-2">✅</div>
+                    <p class="text-sm text-gray-600">العملاء المسددين</p>
+                    <p id="customersPageClearedCount" class="text-xl font-bold text-green-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 text-center">
+                    <div class="text-2xl mb-2">☑️</div>
+                    <p class="text-sm text-gray-600">المحدد حالياً</p>
+                    <p id="customersPageSelectedCount" class="text-xl font-bold text-purple-600">0</p>
+                </div>
+            </div>
+
+            <!-- Customers List -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div id="customersPageList" class="space-y-3">
+                    <!-- Customers will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <div class="flex items-center justify-center mb-4">
+                <div class="text-3xl ml-3">💰</div>
+                <h3 class="text-xl font-bold">نظام إدارة مديونية العملاء</h3>
+            </div>
+            <p class="text-gray-300 mb-2">فرع الساحل - الإصدار 7.1</p>
+            <p class="text-sm text-gray-400">
+                تطوير: <span class="font-semibold text-blue-300">Minavir</span> | 
+                © 2025 جميع الحقوق محفوظة
+            </p>
+            <div class="mt-4 text-xs text-gray-500">
+                <p>آخر تحديث: يناير 2025</p>
+                <p>متوافق مع جميع المتصفحات الحديثة</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Transaction History Modal -->
+    <div id="historyModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl p-6 m-4 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="modalTitle" class="text-2xl font-bold text-gray-800"></h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- Success Message -->
+    <div id="successMessage" class="fixed top-20 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hidden z-50">
+        <span id="successText">تم الحفظ بنجاح!</span>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 text-center">
+            <div class="loading mb-4"></div>
+            <p class="text-gray-700">جاري المعالجة...</p>
+        </div>
+    </div>
+
+    <script>
+        // Data storage
+        let customers = JSON.parse(localStorage.getItem('customersData')) || {};
+        let transactions = JSON.parse(localStorage.getItem('transactionsData')) || [];
+        let selectedCustomers = new Set();
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            updateStatistics();
+            renderCustomersList();
+            setupEventListeners();
+            populateYearOptions();
+            populateCustomerOptions();
+            setCurrentMonthYear();
+            updateLastUpdateTime();
+            checkConnectionStatus();
+            checkBackupReminder();
+            
+            // Auto-save every 30 seconds
+            setInterval(autoSave, 30000);
+        }
+
+        function setupEventListeners() {
+            document.getElementById('customerForm').addEventListener('submit', handleNewCustomer);
+            document.getElementById('transactionForm').addEventListener('submit', handleTransaction);
+            document.getElementById('customerCode').addEventListener('input', validateCustomerCode);
+            document.getElementById('searchCustomer').addEventListener('input', filterCustomers);
+            document.getElementById('statusFilter').addEventListener('change', filterCustomers);
+            document.getElementById('quickSearchCode').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    quickSearch();
+                }
+            });
+
+            // Connection status monitoring
+            window.addEventListener('online', updateConnectionStatus);
+            window.addEventListener('offline', updateConnectionStatus);
+        }
+
+        function checkConnectionStatus() {
+            updateConnectionStatus();
+            setInterval(updateConnectionStatus, 30000);
+        }
+
+        function updateConnectionStatus() {
+            const statusEl = document.getElementById('connectionStatus');
+            if (navigator.onLine) {
+                statusEl.textContent = '🌐 متصل بالإنترنت';
+                statusEl.classList.add('online-indicator');
+                statusEl.style.display = 'none';
+            } else {
+                statusEl.textContent = '🌐 غير متصل بالإنترنت';
+                statusEl.classList.remove('online-indicator');
+                statusEl.style.display = 'block';
+            }
+        }
+
+        function checkBackupReminder() {
+            const lastBackup = localStorage.getItem('lastBackupDate');
+            if (lastBackup) {
+                const lastBackupDate = new Date(lastBackup);
+                const now = new Date();
+                const daysDiff = Math.floor((now - lastBackupDate) / (1000 * 60 * 60 * 24));
+                
+                if (daysDiff > 7) {
+                    document.getElementById('backupReminder').style.display = 'block';
+                }
+            } else {
+                document.getElementById('backupReminder').style.display = 'block';
+            }
+        }
+
+        function hideBackupReminder() {
+            document.getElementById('backupReminder').style.display = 'none';
+        }
+
+        function autoSave() {
+            try {
+                localStorage.setItem('customersData', JSON.stringify(customers));
+                localStorage.setItem('transactionsData', JSON.stringify(transactions));
+                localStorage.setItem('lastAutoSave', new Date().toISOString());
+                updateLastUpdateTime();
+            } catch (error) {
+                console.error('Auto-save failed:', error);
+            }
+        }
+
+        function updateLastUpdateTime() {
+            const lastUpdate = localStorage.getItem('lastAutoSave');
+            if (lastUpdate) {
+                const date = new Date(lastUpdate);
+                document.getElementById('lastUpdate').textContent = date.toLocaleString('ar-EG');
+            } else {
+                document.getElementById('lastUpdate').textContent = 'لم يتم الحفظ بعد';
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+            document.getElementById('loadingOverlay').classList.add('flex');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.remove('flex');
+        }
+
+        function handleNewCustomer(e) {
+            e.preventDefault();
+            
+            const customerCode = document.getElementById('newCustomerCode').value.trim().toUpperCase();
+            const customerName = document.getElementById('newCustomerName').value.trim();
+            const customerPhone = document.getElementById('newCustomerPhone').value.trim();
+            const customerAddress = document.getElementById('newCustomerAddress').value.trim();
+            
+            if (!customerCode || !customerName) {
+                alert('يرجى ملء كود العميل والاسم على الأقل');
+                return;
+            }
+
+            if (customers[customerCode]) {
+                alert('كود العميل موجود بالفعل! يرجى استخدام كود مختلف');
+                return;
+            }
+
+            showLoading();
+
+            customers[customerCode] = {
+                code: customerCode,
+                name: customerName,
+                phone: customerPhone,
+                address: customerAddress,
+                totalDebt: 0,
+                totalPaid: 0,
+                balance: 0,
+                createdAt: new Date().toISOString()
+            };
+
+            localStorage.setItem('customersData', JSON.stringify(customers));
+
+            document.getElementById('customerForm').reset();
+            updateStatistics();
+            renderCustomersList();
+            hideLoading();
+            showSuccessMessage(`تم تسجيل العميل ${customerName} بكود ${customerCode} بنجاح!`);
+        }
+
+        function handleTransaction(e) {
+            e.preventDefault();
+            
+            const customerCode = document.getElementById('customerCode').value.trim().toUpperCase();
+            const transactionType = document.getElementById('transactionType').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const description = document.getElementById('description').value.trim();
+            
+            if (!customerCode || !transactionType || !amount) {
+                alert('يرجى ملء جميع الحقول المطلوبة');
+                return;
+            }
+
+            if (!customers[customerCode]) {
+                alert('كود العميل غير موجود! يرجى تسجيل العميل أولاً أو التأكد من الكود');
+                return;
+            }
+
+            showLoading();
+
+            const transaction = {
+                id: Date.now(),
+                customerCode: customerCode,
+                customerName: customers[customerCode].name,
+                type: transactionType,
+                amount: amount,
+                description: description,
+                date: new Date().toISOString(),
+                timestamp: new Date().toLocaleString('ar-EG')
+            };
+
+            if (transactionType === 'debt') {
+                customers[customerCode].totalDebt += amount;
+                customers[customerCode].balance += amount;
+            } else if (transactionType === 'payment') {
+                customers[customerCode].totalPaid += amount;
+                customers[customerCode].balance -= amount;
+                if (customers[customerCode].balance < 0) {
+                    customers[customerCode].balance = 0;
+                }
+            }
+
+            transactions.push(transaction);
+
+            localStorage.setItem('customersData', JSON.stringify(customers));
+            localStorage.setItem('transactionsData', JSON.stringify(transactions));
+
+            document.getElementById('transactionForm').reset();
+            document.getElementById('customerInfo').classList.add('hidden');
+
+            updateStatistics();
+            renderCustomersList();
+            populateCustomerOptions();
+            hideLoading();
+            showSuccessMessage(`تم تسجيل ${transactionType === 'debt' ? 'المديونية' : 'الدفعة'} بنجاح!`);
+        }
+
+        function validateCustomerCode() {
+            const customerCode = document.getElementById('customerCode').value.trim().toUpperCase();
+            const customerInfo = document.getElementById('customerInfo');
+            const customerDetails = document.getElementById('customerDetails');
+            
+            if (customerCode && customers[customerCode]) {
+                const customer = customers[customerCode];
+                customerDetails.innerHTML = `
+                    <strong>${customer.name}</strong><br>
+                    ${customer.phone ? `📞 ${customer.phone}<br>` : ''}
+                    ${customer.address ? `📍 ${customer.address}<br>` : ''}
+                    <span class="text-sm">الرصيد الحالي: <span class="${customer.balance > 0 ? 'text-red-600' : 'text-green-600'} font-semibold">${customer.balance.toFixed(2)} جنيه</span></span>
+                `;
+                customerInfo.classList.remove('hidden');
+            } else {
+                customerInfo.classList.add('hidden');
+            }
+        }
+
+        function updateStatistics() {
+            const customerCodes = Object.keys(customers);
+            const totalCustomers = customerCodes.length;
+            let totalDebt = 0;
+            let totalPaid = 0;
+            let debtorCount = 0;
+            let totalOwed = 0;
+            let totalDue = 0;
+
+            customerCodes.forEach(code => {
+                const customer = customers[code];
+                totalDebt += customer.totalDebt;
+                totalPaid += customer.totalPaid;
+                
+                if (customer.balance > 0) {
+                    debtorCount++;
+                    totalDue += customer.balance;
+                } else if (customer.balance < 0) {
+                    totalOwed += Math.abs(customer.balance);
+                }
+            });
+
+            document.getElementById('totalCustomers').textContent = totalCustomers;
+            document.getElementById('totalDebt').textContent = `${totalDebt.toFixed(2)} جنيه`;
+            document.getElementById('totalPaid').textContent = `${totalPaid.toFixed(2)} جنيه`;
+            document.getElementById('debtorCount').textContent = debtorCount;
+            document.getElementById('totalOwed').textContent = `${totalOwed.toFixed(2)} جنيه`;
+            document.getElementById('totalDue').textContent = `${totalDue.toFixed(2)} جنيه`;
+        }
+
+        function renderCustomersList() {
+            const container = document.getElementById('customersList');
+            const customerCodes = Object.keys(customers);
+
+            if (customerCodes.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="text-6xl mb-4">📋</div>
+                        <p class="text-lg">لا توجد بيانات عملاء حتى الآن</p>
+                        <p class="text-sm">ابدأ بإضافة عميل جديد أو معاملة</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const customersHTML = customerCodes.map(code => {
+                const customer = customers[code];
+                const statusColor = customer.balance > 0 ? 'text-red-600' : 'text-green-600';
+                const statusIcon = customer.balance > 0 ? '⚠️' : '✅';
+                const statusText = customer.balance > 0 ? 'مديون' : 'مسدد';
+
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow fade-in">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <h3 class="text-lg font-semibold text-gray-800">${customer.name}</h3>
+                                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">${customer.code}</span>
+                                </div>
+                                ${customer.phone ? `<p class="text-sm text-gray-600 mb-1">📞 ${customer.phone}</p>` : ''}
+                                ${customer.address ? `<p class="text-sm text-gray-600 mb-2">📍 ${customer.address}</p>` : ''}
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                        <span class="text-gray-600">إجمالي المديونية:</span>
+                                        <p class="font-semibold text-red-600">${customer.totalDebt.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600">إجمالي المدفوع:</span>
+                                        <p class="font-semibold text-green-600">${customer.totalPaid.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600">الرصيد المتبقي:</span>
+                                        <p class="font-semibold ${statusColor}">${customer.balance.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-600">الحالة:</span>
+                                        <p class="font-semibold ${statusColor}">${statusIcon} ${statusText}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2 mr-4">
+                                <button onclick="showCustomerHistory('${code}')" 
+                                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                                    📊 السجل التفصيلي
+                                </button>
+                                <button onclick="deleteCustomer('${code}')" 
+                                        class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition duration-200">
+                                    🗑️ حذف
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = customersHTML;
+        }
+
+        function quickSearch() {
+            const searchCode = document.getElementById('quickSearchCode').value.trim().toUpperCase();
+            const resultDiv = document.getElementById('quickSearchResult');
+            
+            if (!searchCode) {
+                resultDiv.classList.add('hidden');
+                return;
+            }
+            
+            if (customers[searchCode]) {
+                const customer = customers[searchCode];
+                const statusColor = customer.balance > 0 ? 'text-red-600' : 'text-green-600';
+                const statusIcon = customer.balance > 0 ? '⚠️' : '✅';
+                
+                resultDiv.innerHTML = `
+                    <div class="bg-white border border-gray-300 rounded-lg p-4 shadow-sm">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h4 class="font-semibold text-lg">${customer.name}</h4>
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">${customer.code}</span>
+                            </div>
+                            <span class="${statusColor} text-lg">${statusIcon}</span>
+                        </div>
+                        ${customer.phone ? `<p class="text-sm text-gray-600 mb-1">📞 ${customer.phone}</p>` : ''}
+                        ${customer.address ? `<p class="text-sm text-gray-600 mb-2">📍 ${customer.address}</p>` : ''}
+                        <div class="grid grid-cols-3 gap-3 text-sm">
+                            <div class="text-center">
+                                <p class="text-gray-600">إجمالي المديونية</p>
+                                <p class="font-bold text-red-600">${customer.totalDebt.toFixed(2)} جنيه</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-gray-600">إجمالي المدفوع</p>
+                                <p class="font-bold text-green-600">${customer.totalPaid.toFixed(2)} جنيه</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-gray-600">الرصيد المتبقي</p>
+                                <p class="font-bold ${statusColor}">${customer.balance.toFixed(2)} جنيه</p>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button onclick="showCustomerHistory('${searchCode}')" 
+                                    class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                                📊 السجل التفصيلي
+                            </button>
+                            <button onclick="document.getElementById('customerCode').value='${searchCode}'; validateCustomerCode();" 
+                                    class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm">
+                                💰 إضافة معاملة
+                            </button>
+                        </div>
+                    </div>
+                `;
+                resultDiv.classList.remove('hidden');
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                        <p class="text-red-600">❌ لم يتم العثور على عميل بهذا الكود</p>
+                        <p class="text-sm text-gray-600 mt-1">تأكد من الكود أو قم بتسجيل العميل أولاً</p>
+                    </div>
+                `;
+                resultDiv.classList.remove('hidden');
+            }
+        }
+
+        function showCustomerHistory(customerCode) {
+            const customer = customers[customerCode];
+            const customerTransactions = transactions.filter(t => t.customerCode === customerCode || t.customerName === customer.name);
+            
+            document.getElementById('modalTitle').textContent = `السجل التفصيلي - ${customer.name} (${customerCode})`;
+            
+            let historyHTML = `
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="font-semibold text-lg mb-2">ملخص الحساب</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">إجمالي المديونية</p>
+                            <p class="text-xl font-bold text-red-600">${customer.totalDebt.toFixed(2)} جنيه</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">إجمالي المدفوع</p>
+                            <p class="text-xl font-bold text-green-600">${customer.totalPaid.toFixed(2)} جنيه</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-sm text-gray-600">الرصيد المتبقي</p>
+                            <p class="text-xl font-bold ${customer.balance > 0 ? 'text-red-600' : 'text-green-600'}">${customer.balance.toFixed(2)} جنيه</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4 class="font-semibold text-lg mb-4">تاريخ المعاملات</h4>
+            `;
+
+            if (customerTransactions.length === 0) {
+                historyHTML += '<p class="text-gray-500 text-center py-4">لا توجد معاملات مسجلة</p>';
+            } else {
+                historyHTML += '<div class="space-y-3">';
+                customerTransactions.reverse().forEach(transaction => {
+                    const typeIcon = transaction.type === 'debt' ? '💸' : '💚';
+                    const typeText = transaction.type === 'debt' ? 'مديونية' : 'دفعة';
+                    const amountColor = transaction.type === 'debt' ? 'text-red-600' : 'text-green-600';
+                    
+                    historyHTML += `
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="text-lg">${typeIcon}</span>
+                                        <span class="font-semibold">${typeText}</span>
+                                        <span class="text-sm text-gray-500">${transaction.timestamp}</span>
+                                    </div>
+                                    <p class="text-lg font-bold ${amountColor}">${transaction.amount.toFixed(2)} جنيه</p>
+                                    ${transaction.description ? `<p class="text-sm text-gray-600 mt-1">${transaction.description}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                historyHTML += '</div>';
+            }
+
+            document.getElementById('modalContent').innerHTML = historyHTML;
+            document.getElementById('historyModal').classList.remove('hidden');
+            document.getElementById('historyModal').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('historyModal').classList.add('hidden');
+            document.getElementById('historyModal').classList.remove('flex');
+        }
+
+        function deleteCustomer(customerCode) {
+            const customer = customers[customerCode];
+            if (confirm(`هل أنت متأكد من حذف العميل "${customer.name}" (${customerCode}) وجميع معاملاته؟`)) {
+                delete customers[customerCode];
+                transactions = transactions.filter(t => t.customerCode !== customerCode && t.customerName !== customer.name);
+                
+                localStorage.setItem('customersData', JSON.stringify(customers));
+                localStorage.setItem('transactionsData', JSON.stringify(transactions));
+                
+                updateStatistics();
+                renderCustomersList();
+                showSuccessMessage('تم حذف العميل بنجاح');
+            }
+        }
+
+        function filterCustomers() {
+            const searchTerm = document.getElementById('searchCustomer').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            const customerCards = document.querySelectorAll('#customersList > div');
+            
+            customerCards.forEach(card => {
+                if (card.querySelector('h3')) {
+                    const customerName = card.querySelector('h3').textContent.toLowerCase();
+                    const customerCode = card.querySelector('.bg-blue-100').textContent.toLowerCase();
+                    const balanceElement = card.querySelector('.font-semibold.text-red-600, .font-semibold.text-green-600');
+                    const balance = balanceElement ? parseFloat(balanceElement.textContent) : 0;
+                    
+                    let showCard = true;
+                    
+                    if (searchTerm && !customerName.includes(searchTerm) && !customerCode.includes(searchTerm)) {
+                        showCard = false;
+                    }
+                    
+                    if (statusFilter === 'debtors' && balance <= 0) {
+                        showCard = false;
+                    } else if (statusFilter === 'cleared' && balance > 0) {
+                        showCard = false;
+                    }
+                    
+                    card.style.display = showCard ? 'block' : 'none';
+                }
+            });
+        }
+
+        function populateYearOptions() {
+            const yearSelects = ['reportYear', 'customerReportYear'];
+            const currentYear = new Date().getFullYear();
+            
+            yearSelects.forEach(selectId => {
+                const yearSelect = document.getElementById(selectId);
+                if (yearSelect) {
+                    yearSelect.innerHTML = '';
+                    
+                    for (let year = 2020; year <= currentYear + 5; year++) {
+                        const option = document.createElement('option');
+                        option.value = year;
+                        option.textContent = year;
+                        if (year === currentYear) {
+                            option.selected = true;
+                        }
+                        yearSelect.appendChild(option);
+                    }
+                }
+            });
+        }
+
+        function populateCustomerOptions() {
+            const customerSelect = document.getElementById('customerReportCode');
+            if (!customerSelect) return;
+            
+            customerSelect.innerHTML = '<option value="">اختر العميل</option>';
+            
+            Object.keys(customers).sort().forEach(code => {
+                const customer = customers[code];
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = `${customer.name} (${code})`;
+                customerSelect.appendChild(option);
+            });
+        }
+
+        function setCurrentMonthYear() {
+            const now = new Date();
+            document.getElementById('reportMonth').value = now.getMonth() + 1;
+            document.getElementById('customerReportMonth').value = now.getMonth() + 1;
+        }
+
+        function generateCustomerReport() {
+            const customerCode = document.getElementById('customerReportCode').value;
+            const reportType = document.getElementById('customerReportType').value;
+            const selectedMonth = parseInt(document.getElementById('customerReportMonth').value);
+            const selectedYear = parseInt(document.getElementById('customerReportYear').value);
+            
+            if (!customerCode) {
+                alert('يرجى اختيار العميل أولاً');
+                return;
+            }
+            
+            if (!customers[customerCode]) {
+                alert('العميل المحدد غير موجود');
+                return;
+            }
+            
+            const customer = customers[customerCode];
+            const monthNames = [
+                '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+            ];
+            
+            let customerTransactions = transactions.filter(t => 
+                t.customerCode === customerCode || t.customerName === customer.name
+            );
+            
+            // Filter based on report type
+            if (reportType === 'monthly') {
+                customerTransactions = customerTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.date);
+                    const transactionMonth = transactionDate.getMonth() + 1;
+                    const transactionYear = transactionDate.getFullYear();
+                    return transactionMonth === selectedMonth && transactionYear === selectedYear;
+                });
+            } else if (reportType === 'yearly') {
+                customerTransactions = customerTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.date);
+                    const transactionYear = transactionDate.getFullYear();
+                    return transactionYear === selectedYear;
+                });
+            }
+            // For 'full' type, we use all transactions
+            
+            // Calculate statistics
+            let totalDebt = 0;
+            let totalPayments = 0;
+            const monthlyBreakdown = {};
+            
+            customerTransactions.forEach(transaction => {
+                const transactionDate = new Date(transaction.date);
+                const monthKey = `${transactionDate.getFullYear()}-${transactionDate.getMonth() + 1}`;
+                
+                if (!monthlyBreakdown[monthKey]) {
+                    monthlyBreakdown[monthKey] = {
+                        month: transactionDate.getMonth() + 1,
+                        year: transactionDate.getFullYear(),
+                        debt: 0,
+                        payments: 0,
+                        transactions: []
+                    };
+                }
+                
+                monthlyBreakdown[monthKey].transactions.push(transaction);
+                
+                if (transaction.type === 'debt') {
+                    totalDebt += transaction.amount;
+                    monthlyBreakdown[monthKey].debt += transaction.amount;
+                } else if (transaction.type === 'payment') {
+                    totalPayments += transaction.amount;
+                    monthlyBreakdown[monthKey].payments += transaction.amount;
+                }
+            });
+            
+            const netAmount = totalDebt - totalPayments;
+            
+            // Generate report title
+            let reportTitle = '';
+            if (reportType === 'monthly') {
+                reportTitle = `التقرير الشهري - ${monthNames[selectedMonth]} ${selectedYear}`;
+            } else if (reportType === 'yearly') {
+                reportTitle = `التقرير السنوي - ${selectedYear}`;
+            } else {
+                reportTitle = 'التقرير الشامل';
+            }
+            
+            // Generate report HTML
+            let reportHTML = `
+                <div class="mb-6 p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-800">${reportTitle}</h3>
+                            <p class="text-lg text-purple-700 font-semibold">${customer.name} (${customer.code})</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-4xl mb-2">👤</div>
+                            <p class="text-sm text-gray-600">تاريخ الإنشاء</p>
+                            <p class="font-semibold">${new Date().toLocaleDateString('ar-EG')}</p>
+                        </div>
+                    </div>
+                    
+                    ${customer.phone ? `<p class="text-sm text-gray-600 mb-1">📞 ${customer.phone}</p>` : ''}
+                    ${customer.address ? `<p class="text-sm text-gray-600 mb-3">📍 ${customer.address}</p>` : ''}
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="text-center bg-white rounded-lg p-4 shadow-sm">
+                            <div class="text-2xl mb-2">💸</div>
+                            <p class="text-sm text-gray-600">إجمالي المديونيات</p>
+                            <p class="text-xl font-bold text-red-600">${totalDebt.toFixed(2)} جنيه</p>
+                        </div>
+                        <div class="text-center bg-white rounded-lg p-4 shadow-sm">
+                            <div class="text-2xl mb-2">💚</div>
+                            <p class="text-sm text-gray-600">إجمالي المدفوعات</p>
+                            <p class="text-xl font-bold text-green-600">${totalPayments.toFixed(2)} جنيه</p>
+                        </div>
+                        <div class="text-center bg-white rounded-lg p-4 shadow-sm">
+                            <div class="text-2xl mb-2">📊</div>
+                            <p class="text-sm text-gray-600">صافي الحساب</p>
+                            <p class="text-xl font-bold ${netAmount >= 0 ? 'text-red-600' : 'text-green-600'}">${netAmount.toFixed(2)} جنيه</p>
+                        </div>
+                        <div class="text-center bg-white rounded-lg p-4 shadow-sm">
+                            <div class="text-2xl mb-2">📋</div>
+                            <p class="text-sm text-gray-600">عدد المعاملات</p>
+                            <p class="text-xl font-bold text-blue-600">${customerTransactions.length}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (customerTransactions.length === 0) {
+                reportHTML += `
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="text-6xl mb-4">📅</div>
+                        <p class="text-lg">لا توجد معاملات في الفترة المحددة</p>
+                        <p class="text-sm mt-2">تأكد من وجود معاملات مسجلة للعميل في هذه الفترة</p>
+                    </div>
+                `;
+            } else {
+                // Monthly breakdown for yearly and full reports
+                if (reportType !== 'monthly' && Object.keys(monthlyBreakdown).length > 1) {
+                    reportHTML += `
+                        <div class="mb-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">التفصيل الشهري</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    `;
+                    
+                    Object.keys(monthlyBreakdown).sort().forEach(monthKey => {
+                        const monthData = monthlyBreakdown[monthKey];
+                        const monthNet = monthData.debt - monthData.payments;
+                        
+                        reportHTML += `
+                            <div class="border border-gray-200 rounded-lg p-4 bg-white">
+                                <h5 class="font-semibold text-center mb-3">${monthNames[monthData.month]} ${monthData.year}</h5>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>مديونيات:</span>
+                                        <span class="font-semibold text-red-600">${monthData.debt.toFixed(2)} جنيه</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>مدفوعات:</span>
+                                        <span class="font-semibold text-green-600">${monthData.payments.toFixed(2)} جنيه</span>
+                                    </div>
+                                    <div class="flex justify-between border-t pt-2">
+                                        <span>الصافي:</span>
+                                        <span class="font-bold ${monthNet >= 0 ? 'text-red-600' : 'text-green-600'}">${monthNet.toFixed(2)} جنيه</span>
+                                    </div>
+                                    <div class="text-center text-xs text-gray-500">
+                                        ${monthData.transactions.length} معاملة
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    reportHTML += `</div></div>`;
+                }
+                
+                // Detailed transactions
+                reportHTML += `
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">تفاصيل المعاملات (${customerTransactions.length} معاملة)</h4>
+                        <div class="space-y-2 max-h-96 overflow-y-auto">
+                `;
+                
+                // Sort transactions by date (newest first)
+                const sortedTransactions = [...customerTransactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                sortedTransactions.forEach(transaction => {
+                    const typeIcon = transaction.type === 'debt' ? '💸' : '💚';
+                    const typeText = transaction.type === 'debt' ? 'مديونية' : 'دفعة';
+                    const amountColor = transaction.type === 'debt' ? 'text-red-600' : 'text-green-600';
+                    
+                    reportHTML += `
+                        <div class="border border-gray-200 rounded-lg p-3 bg-white">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-lg">${typeIcon}</span>
+                                    <div>
+                                        <span class="font-semibold">${typeText}</span>
+                                        <p class="text-xs text-gray-500">${new Date(transaction.date).toLocaleDateString('ar-EG')} - ${new Date(transaction.date).toLocaleTimeString('ar-EG', {hour: '2-digit', minute: '2-digit'})}</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold ${amountColor} text-lg">${transaction.amount.toFixed(2)} جنيه</p>
+                                </div>
+                            </div>
+                            ${transaction.description ? `<p class="text-sm text-gray-600 mt-2 pr-8">${transaction.description}</p>` : ''}
+                        </div>
+                    `;
+                });
+                
+                reportHTML += `</div></div>`;
+                
+                // Current balance section
+                reportHTML += `
+                    <div class="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">الرصيد الحالي للعميل</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="text-center">
+                                <p class="text-sm text-gray-600">إجمالي المديونية الحالية</p>
+                                <p class="text-xl font-bold text-red-600">${customer.totalDebt.toFixed(2)} جنيه</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm text-gray-600">إجمالي المدفوع الحالي</p>
+                                <p class="text-xl font-bold text-green-600">${customer.totalPaid.toFixed(2)} جنيه</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-sm text-gray-600">الرصيد المتبقي</p>
+                                <p class="text-2xl font-bold ${customer.balance > 0 ? 'text-red-600' : 'text-green-600'}">${customer.balance.toFixed(2)} جنيه</p>
+                                <p class="text-xs text-gray-500 mt-1">${customer.balance > 0 ? 'مديون' : 'مسدد'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('customerReportContent').innerHTML = reportHTML;
+            showSuccessMessage(`تم إنشاء ${reportTitle} للعميل ${customer.name} بنجاح!`);
+        }
+
+        function printCustomerReport() {
+            const reportContent = document.getElementById('customerReportContent');
+            const customerCode = document.getElementById('customerReportCode').value;
+            
+            if (!customerCode || !reportContent.innerHTML.includes('التقرير')) {
+                alert('يرجى إنشاء تقرير العميل أولاً قبل الطباعة');
+                return;
+            }
+            
+            const customer = customers[customerCode];
+            const reportType = document.getElementById('customerReportType').value;
+            const selectedMonth = parseInt(document.getElementById('customerReportMonth').value);
+            const selectedYear = parseInt(document.getElementById('customerReportYear').value);
+            
+            const monthNames = [
+                '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+            ];
+            
+            let customerTransactions = transactions.filter(t => 
+                t.customerCode === customerCode || t.customerName === customer.name
+            );
+            
+            // Filter based on report type
+            if (reportType === 'monthly') {
+                customerTransactions = customerTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.date);
+                    const transactionMonth = transactionDate.getMonth() + 1;
+                    const transactionYear = transactionDate.getFullYear();
+                    return transactionMonth === selectedMonth && transactionYear === selectedYear;
+                });
+            } else if (reportType === 'yearly') {
+                customerTransactions = customerTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.date);
+                    const transactionYear = transactionDate.getFullYear();
+                    return transactionYear === selectedYear;
+                });
+            }
+            
+            // Calculate statistics
+            let totalDebt = 0;
+            let totalPayments = 0;
+            
+            customerTransactions.forEach(transaction => {
+                if (transaction.type === 'debt') {
+                    totalDebt += transaction.amount;
+                } else if (transaction.type === 'payment') {
+                    totalPayments += transaction.amount;
+                }
+            });
+            
+            const netAmount = totalDebt - totalPayments;
+            
+            // Generate report title
+            let reportTitle = '';
+            let periodText = '';
+            if (reportType === 'monthly') {
+                reportTitle = `التقرير الشهري - ${monthNames[selectedMonth]} ${selectedYear}`;
+                periodText = `${monthNames[selectedMonth]} ${selectedYear}`;
+            } else if (reportType === 'yearly') {
+                reportTitle = `التقرير السنوي - ${selectedYear}`;
+                periodText = `العام ${selectedYear}`;
+            } else {
+                reportTitle = 'التقرير الشامل';
+                periodText = 'جميع الفترات';
+            }
+            
+            const printWindow = window.open('', '_blank');
+            const printContent = `
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${reportTitle} - ${customer.name}</title>
+                    <style>
+                        body {
+                            font-family: 'Arial', 'Tahoma', sans-serif;
+                            margin: 10px;
+                            color: #000;
+                            direction: rtl;
+                            font-size: 11px;
+                            line-height: 1.3;
+                            background: white;
+                        }
+                        
+                        /* Excel-style table formatting */
+                        .excel-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin: 15px 0;
+                            border: 2px solid #000;
+                        }
+                        
+                        .excel-table th {
+                            background: linear-gradient(to bottom, #70AD47, #548235);
+                            color: white;
+                            font-weight: bold;
+                            padding: 8px 6px;
+                            border: 1px solid #000;
+                            text-align: center;
+                            font-size: 10px;
+                        }
+                        
+                        .excel-table td {
+                            padding: 6px 8px;
+                            border: 1px solid #000;
+                            text-align: center;
+                            font-size: 10px;
+                        }
+                        
+                        .excel-table .row-number {
+                            background: #D9E2F3;
+                            font-weight: bold;
+                            width: 30px;
+                            text-align: center;
+                        }
+                        
+                        .excel-table .total-row {
+                            background: #FFF2CC;
+                            font-weight: bold;
+                            border-top: 2px solid #000;
+                        }
+                        
+                        .excel-table .customer-row {
+                            background: #E2EFDA;
+                            font-weight: bold;
+                        }
+                        
+                        .header-section {
+                            background: linear-gradient(to right, #70AD47, #4472C4);
+                            color: white;
+                            padding: 15px;
+                            margin-bottom: 20px;
+                            border: 2px solid #000;
+                            text-align: center;
+                        }
+                        
+                        .header-section h1 {
+                            margin: 0 0 8px 0;
+                            font-size: 18px;
+                            font-weight: bold;
+                        }
+                        
+                        .header-section p {
+                            margin: 3px 0;
+                            font-size: 12px;
+                        }
+                        
+                        .customer-info-section {
+                            background: #F8F9FA;
+                            border: 2px solid #70AD47;
+                            padding: 15px;
+                            margin: 15px 0;
+                            border-radius: 5px;
+                        }
+                        
+                        .summary-grid {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 10px;
+                            margin: 15px 0;
+                        }
+                        
+                        .summary-card {
+                            border: 2px solid #000;
+                            padding: 10px;
+                            text-align: center;
+                            border-radius: 5px;
+                        }
+                        
+                        .summary-card.debt {
+                            background: linear-gradient(to bottom, #FFE6E6, #FFCCCC);
+                        }
+                        
+                        .summary-card.payment {
+                            background: linear-gradient(to bottom, #E6F7E6, #CCEECC);
+                        }
+                        
+                        .summary-card.net {
+                            background: linear-gradient(to bottom, #E6F3FF, #CCE7FF);
+                        }
+                        
+                        .summary-card.count {
+                            background: linear-gradient(to bottom, #FFF0E6, #FFE1CC);
+                        }
+                        
+                        .summary-card h3 {
+                            margin: 0 0 5px 0;
+                            font-size: 10px;
+                            color: #333;
+                        }
+                        
+                        .summary-card .value {
+                            font-size: 14px;
+                            font-weight: bold;
+                            margin: 5px 0;
+                        }
+                        
+                        .debt-value { color: #C5504B; }
+                        .payment-value { color: #70AD47; }
+                        .net-positive { color: #C5504B; }
+                        .net-negative { color: #70AD47; }
+                        .count-value { color: #4472C4; }
+                        
+                        .section-title {
+                            background: linear-gradient(to right, #70AD47, #4472C4);
+                            color: white;
+                            padding: 8px 15px;
+                            margin: 20px 0 10px 0;
+                            font-weight: bold;
+                            font-size: 12px;
+                            border: 1px solid #000;
+                        }
+                        
+                        .current-balance-section {
+                            background: #F0F8FF;
+                            border: 2px solid #4472C4;
+                            padding: 15px;
+                            margin: 20px 0;
+                            border-radius: 5px;
+                        }
+                        
+                        .footer-section {
+                            margin-top: 30px;
+                            text-align: center;
+                            font-size: 9px;
+                            color: #666;
+                            border-top: 2px solid #000;
+                            padding-top: 10px;
+                            background: #F8F9FA;
+                        }
+                        
+                        @media print {
+                            body { margin: 0; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- Header Section -->
+                    <div class="header-section">
+                        <h1>👤 ${reportTitle}</h1>
+                        <p><strong>نظام إدارة مديونية العملاء - فرع الساحل</strong></p>
+                        <p>تاريخ الإنشاء: ${new Date().toLocaleString('ar-EG')} | الإصدار 7.1</p>
+                    </div>
+                    
+                    <!-- Customer Information -->
+                    <div class="customer-info-section">
+                        <h2 style="color: #70AD47; margin: 0 0 10px 0; font-size: 14px;">معلومات العميل</h2>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                            <div>
+                                <p><strong>اسم العميل:</strong> ${customer.name}</p>
+                                <p><strong>كود العميل:</strong> ${customer.code}</p>
+                            </div>
+                            <div>
+                                ${customer.phone ? `<p><strong>رقم الهاتف:</strong> ${customer.phone}</p>` : ''}
+                                ${customer.address ? `<p><strong>العنوان:</strong> ${customer.address}</p>` : ''}
+                                <p><strong>فترة التقرير:</strong> ${periodText}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Summary Statistics -->
+                    <div class="section-title">📊 ملخص إحصائيات الفترة المحددة</div>
+                    
+                    <div class="summary-grid">
+                        <div class="summary-card debt">
+                            <h3>💸 إجمالي المديونيات</h3>
+                            <div class="value debt-value">${totalDebt.toFixed(2)} جنيه</div>
+                        </div>
+                        
+                        <div class="summary-card payment">
+                            <h3>💚 إجمالي المدفوعات</h3>
+                            <div class="value payment-value">${totalPayments.toFixed(2)} جنيه</div>
+                        </div>
+                        
+                        <div class="summary-card net">
+                            <h3>📈 صافي الحساب</h3>
+                            <div class="value ${netAmount >= 0 ? 'net-positive' : 'net-negative'}">${netAmount.toFixed(2)} جنيه</div>
+                        </div>
+                        
+                        <div class="summary-card count">
+                            <h3>📋 عدد المعاملات</h3>
+                            <div class="value count-value">${customerTransactions.length} معاملة</div>
+                        </div>
+                    </div>
+                    
+                    ${customerTransactions.length > 0 ? `
+                    <!-- Detailed Transactions -->
+                    <div class="section-title">📋 سجل المعاملات التفصيلي (${customerTransactions.length} معاملة)</div>
+                    
+                    <table class="excel-table">
+                        <thead>
+                            <tr>
+                                <th class="row-number">#</th>
+                                <th>التاريخ</th>
+                                <th>الوقت</th>
+                                <th>نوع المعاملة</th>
+                                <th>المبلغ (جنيه)</th>
+                                <th>الوصف</th>
+                                <th>الرصيد التراكمي</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${customerTransactions.sort((a, b) => new Date(a.date) - new Date(b.date)).map((transaction, index) => {
+                                const date = new Date(transaction.date);
+                                const typeText = transaction.type === 'debt' ? 'مديونية' : 'دفعة';
+                                const typeClass = transaction.type === 'debt' ? 'debt-value' : 'payment-value';
+                                const typeIcon = transaction.type === 'debt' ? '💸' : '💚';
+                                
+                                // Calculate running balance
+                                let runningBalance = 0;
+                                for (let i = 0; i <= index; i++) {
+                                    const t = customerTransactions.sort((a, b) => new Date(a.date) - new Date(b.date))[i];
+                                    if (t.type === 'debt') {
+                                        runningBalance += t.amount;
+                                    } else {
+                                        runningBalance -= t.amount;
+                                    }
+                                }
+                                
+                                return `
+                                    <tr>
+                                        <td class="row-number">${index + 1}</td>
+                                        <td>${date.toLocaleDateString('ar-EG')}</td>
+                                        <td>${date.toLocaleTimeString('ar-EG', {hour: '2-digit', minute: '2-digit'})}</td>
+                                        <td class="${typeClass}">${typeIcon} ${typeText}</td>
+                                        <td class="${typeClass}"><strong>${transaction.amount.toFixed(2)}</strong></td>
+                                        <td style="text-align: right; font-size: 9px;">${transaction.description || '-'}</td>
+                                        <td class="${runningBalance >= 0 ? 'debt-value' : 'payment-value'}"><strong>${runningBalance.toFixed(2)}</strong></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="4"><strong>الإجماليات</strong></td>
+                                <td class="${netAmount >= 0 ? 'debt-value' : 'payment-value'}"><strong>${Math.abs(netAmount).toFixed(2)}</strong></td>
+                                <td><strong>${customerTransactions.length} معاملة</strong></td>
+                                <td class="${netAmount >= 0 ? 'debt-value' : 'payment-value'}"><strong>${netAmount.toFixed(2)}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    ` : `
+                    <div style="text-align: center; padding: 40px; background: #F8F9FA; border: 2px solid #ddd; margin: 20px 0;">
+                        <h3 style="color: #666;">📅 لا توجد معاملات في الفترة المحددة</h3>
+                        <p>لم يتم تسجيل أي معاملات للعميل ${customer.name} في ${periodText}</p>
+                    </div>
+                    `}
+                    
+                    <!-- Current Balance Section -->
+                    <div class="current-balance-section">
+                        <h3 style="color: #4472C4; margin: 0 0 15px 0; font-size: 14px;">💰 الرصيد الحالي الإجمالي للعميل</h3>
+                        <div class="summary-grid">
+                            <div class="summary-card debt">
+                                <h3>إجمالي المديونية الحالية</h3>
+                                <div class="value debt-value">${customer.totalDebt.toFixed(2)} جنيه</div>
+                            </div>
+                            
+                            <div class="summary-card payment">
+                                <h3>إجمالي المدفوع الحالي</h3>
+                                <div class="value payment-value">${customer.totalPaid.toFixed(2)} جنيه</div>
+                            </div>
+                            
+                            <div class="summary-card net">
+                                <h3>الرصيد المتبقي</h3>
+                                <div class="value ${customer.balance > 0 ? 'net-positive' : 'net-negative'}">${customer.balance.toFixed(2)} جنيه</div>
+                            </div>
+                            
+                            <div class="summary-card count">
+                                <h3>حالة الحساب</h3>
+                                <div class="value ${customer.balance > 0 ? 'debt-value' : 'payment-value'}">${customer.balance > 0 ? 'مديون' : 'مسدد'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div class="footer-section">
+                        <p><strong>تم إنشاء هذا التقرير بواسطة نظام إدارة مديونية العملاء - الإصدار 7.1</strong></p>
+                        <p>فرع الساحل | © 2025 جميع الحقوق محفوظة | تاريخ الطباعة: ${new Date().toLocaleString('ar-EG')}</p>
+                        <p>تقرير خاص بالعميل: ${customer.name} (${customer.code}) - ${periodText}</p>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+            
+            showSuccessMessage(`تم فتح تقرير ${customer.name} للطباعة بتصميم Excel المحترف`);
+        }
+
+        function exportCustomerReport() {
+            const customerCode = document.getElementById('customerReportCode').value;
+            
+            if (!customerCode) {
+                alert('يرجى اختيار العميل أولاً');
+                return;
+            }
+            
+            const customer = customers[customerCode];
+            const reportType = document.getElementById('customerReportType').value;
+            const selectedMonth = parseInt(document.getElementById('customerReportMonth').value);
+            const selectedYear = parseInt(document.getElementById('customerReportYear').value);
+            
+            const monthNames = [
+                '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+            ];
+            
+            let customerTransactions = transactions.filter(t => 
+                t.customerCode === customerCode || t.customerName === customer.name
+            );
+            
+            // Filter based on report type
+            if (reportType === 'monthly') {
+                customerTransactions = customerTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.date);
+                    const transactionMonth = transactionDate.getMonth() + 1;
+                    const transactionYear = transactionDate.getFullYear();
+                    return transactionMonth === selectedMonth && transactionYear === selectedYear;
+                });
+            } else if (reportType === 'yearly') {
+                customerTransactions = customerTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.date);
+                    const transactionYear = transactionDate.getFullYear();
+                    return transactionYear === selectedYear;
+                });
+            }
+            
+            showLoading();
+            
+            // Generate report title
+            let reportTitle = '';
+            let periodText = '';
+            if (reportType === 'monthly') {
+                reportTitle = `التقرير الشهري - ${monthNames[selectedMonth]} ${selectedYear}`;
+                periodText = `${monthNames[selectedMonth]} ${selectedYear}`;
+            } else if (reportType === 'yearly') {
+                reportTitle = `التقرير السنوي - ${selectedYear}`;
+                periodText = `العام ${selectedYear}`;
+            } else {
+                reportTitle = 'التقرير الشامل';
+                periodText = 'جميع الفترات';
+            }
+            
+            const excelData = [
+                [`${reportTitle} - ${customer.name}`],
+                [`العميل: ${customer.name} (${customer.code})`],
+                [`الفترة: ${periodText}`],
+                [`تاريخ التصدير: ${new Date().toLocaleString('ar-EG')}`],
+                [''],
+                ['معلومات العميل'],
+                ['اسم العميل', customer.name],
+                ['كود العميل', customer.code],
+                ['رقم الهاتف', customer.phone || 'غير محدد'],
+                ['العنوان', customer.address || 'غير محدد'],
+                [''],
+                ['ملخص الحساب'],
+                ['إجمالي المديونية الحالية', customer.totalDebt],
+                ['إجمالي المدفوع الحالي', customer.totalPaid],
+                ['الرصيد المتبقي', customer.balance],
+                ['حالة الحساب', customer.balance > 0 ? 'مديون' : 'مسدد'],
+                [''],
+                ['تفاصيل المعاملات في الفترة المحددة'],
+                ['التاريخ', 'الوقت', 'نوع المعاملة', 'المبلغ', 'الوصف', 'الرصيد التراكمي']
+            ];
+            
+            if (customerTransactions.length > 0) {
+                let runningBalance = 0;
+                customerTransactions.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(transaction => {
+                    const date = new Date(transaction.date);
+                    const typeText = transaction.type === 'debt' ? 'مديونية' : 'دفعة';
+                    
+                    if (transaction.type === 'debt') {
+                        runningBalance += transaction.amount;
+                    } else {
+                        runningBalance -= transaction.amount;
+                    }
+                    
+                    excelData.push([
+                        date.toLocaleDateString('ar-EG'),
+                        date.toLocaleTimeString('ar-EG', {hour: '2-digit', minute: '2-digit'}),
+                        typeText,
+                        transaction.amount,
+                        transaction.description || '',
+                        runningBalance
+                    ]);
+                });
+                
+                const totalDebt = customerTransactions.filter(t => t.type === 'debt').reduce((sum, t) => sum + t.amount, 0);
+                const totalPayments = customerTransactions.filter(t => t.type === 'payment').reduce((sum, t) => sum + t.amount, 0);
+                
+                excelData.push(['']);
+                excelData.push(['الإجماليات']);
+                excelData.push(['إجمالي المديونيات في الفترة', totalDebt]);
+                excelData.push(['إجمالي المدفوعات في الفترة', totalPayments]);
+                excelData.push(['صافي الحساب في الفترة', totalDebt - totalPayments]);
+                excelData.push(['عدد المعاملات', customerTransactions.length]);
+            } else {
+                excelData.push(['لا توجد معاملات في الفترة المحددة']);
+            }
+            
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `تقرير ${customer.name}`);
+            
+            ws['!cols'] = [
+                {wch: 15}, {wch: 10}, {wch: 15}, {wch: 12}, {wch: 30}, {wch: 15}
+            ];
+            
+            const fileName = `تقرير_${customer.name}_${customer.code}_${periodText.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            hideLoading();
+            showSuccessMessage(`تم تصدير تقرير ${customer.name} إلى Excel بنجاح`);
+        }
+
+        function emailCustomerReport() {
+            const customerCode = document.getElementById('customerReportCode').value;
+            
+            if (!customerCode) {
+                alert('يرجى اختيار العميل أولاً');
+                return;
+            }
+            
+            const customer = customers[customerCode];
+            const reportType = document.getElementById('customerReportType').value;
+            const selectedMonth = parseInt(document.getElementById('customerReportMonth').value);
+            const selectedYear = parseInt(document.getElementById('customerReportYear').value);
+            
+            const monthNames = [
+                '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+            ];
+            
+            let reportTitle = '';
+            let periodText = '';
+            if (reportType === 'monthly') {
+                reportTitle = `التقرير الشهري - ${monthNames[selectedMonth]} ${selectedYear}`;
+                periodText = `${monthNames[selectedMonth]} ${selectedYear}`;
+            } else if (reportType === 'yearly') {
+                reportTitle = `التقرير السنوي - ${selectedYear}`;
+                periodText = `العام ${selectedYear}`;
+            } else {
+                reportTitle = 'التقرير الشامل';
+                periodText = 'جميع الفترات';
+            }
+            
+            const subject = `${reportTitle} - ${customer.name} (${customer.code})`;
+            const body = `السلام عليكم ورحمة الله وبركاته
+
+نرسل إليكم ${reportTitle} للعميل ${customer.name} (${customer.code})
+
+فترة التقرير: ${periodText}
+الرصيد الحالي: ${customer.balance.toFixed(2)} جنيه
+حالة الحساب: ${customer.balance > 0 ? 'مديون' : 'مسدد'}
+
+تم إنشاء هذا التقرير من نظام إدارة مديونية العملاء - فرع الساحل
+تاريخ الإنشاء: ${new Date().toLocaleString('ar-EG')}
+
+مع تحيات فريق العمل`;
+            
+            const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            
+            window.open(mailtoLink, '_blank');
+            showSuccessMessage('تم فتح برنامج البريد الإلكتروني لإرسال التقرير');
+        }
+
+        function generateMonthlyReport() {
+            const selectedMonth = parseInt(document.getElementById('reportMonth').value);
+            const selectedYear = parseInt(document.getElementById('reportYear').value);
+            
+            console.log(`Generating report for: ${selectedMonth}/${selectedYear}`);
+            
+            const monthNames = [
+                '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+            ];
+            
+            // Filter transactions for the selected month and year with detailed logging
+            const monthlyTransactions = transactions.filter(transaction => {
+                const transactionDate = new Date(transaction.date);
+                const transactionMonth = transactionDate.getMonth() + 1; // JavaScript months are 0-based
+                const transactionYear = transactionDate.getFullYear();
+                
+                const matches = transactionMonth === selectedMonth && transactionYear === selectedYear;
+                
+                console.log(`Transaction: ${transaction.date} -> Month: ${transactionMonth}, Year: ${transactionYear}, Matches: ${matches}`);
+                
+                return matches;
+            });
+            
+            console.log(`Found ${monthlyTransactions.length} transactions for ${selectedMonth}/${selectedYear}`);
+            
+            // Calculate statistics
+            let totalDebt = 0;
+            let totalPayments = 0;
+            const customerActivity = {};
+            
+            monthlyTransactions.forEach(transaction => {
+                if (transaction.type === 'debt') {
+                    totalDebt += transaction.amount;
+                } else if (transaction.type === 'payment') {
+                    totalPayments += transaction.amount;
+                }
+                
+                if (!customerActivity[transaction.customerCode]) {
+                    customerActivity[transaction.customerCode] = {
+                        name: transaction.customerName,
+                        debt: 0,
+                        payments: 0,
+                        transactions: []
+                    };
+                }
+                
+                customerActivity[transaction.customerCode].transactions.push(transaction);
+                if (transaction.type === 'debt') {
+                    customerActivity[transaction.customerCode].debt += transaction.amount;
+                } else {
+                    customerActivity[transaction.customerCode].payments += transaction.amount;
+                }
+            });
+            
+            // Generate report HTML
+            let reportHTML = `
+                <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">تقرير ${monthNames[selectedMonth]} ${selectedYear}</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">💸</div>
+                            <p class="text-sm text-gray-600">إجمالي المديونيات</p>
+                            <p class="text-2xl font-bold text-red-600">${totalDebt.toFixed(2)} جنيه</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">💚</div>
+                            <p class="text-sm text-gray-600">إجمالي المدفوعات</p>
+                            <p class="text-2xl font-bold text-green-600">${totalPayments.toFixed(2)} جنيه</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">📊</div>
+                            <p class="text-sm text-gray-600">صافي الحركة</p>
+                            <p class="text-2xl font-bold ${(totalDebt - totalPayments) >= 0 ? 'text-red-600' : 'text-green-600'}">
+                                ${(totalDebt - totalPayments).toFixed(2)} جنيه
+                            </p>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl mb-2">📋</div>
+                            <p class="text-sm text-gray-600">عدد المعاملات</p>
+                            <p class="text-2xl font-bold text-blue-600">${monthlyTransactions.length}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (monthlyTransactions.length === 0) {
+                reportHTML += `
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="text-6xl mb-4">📅</div>
+                        <p class="text-lg">لا توجد معاملات في ${monthNames[selectedMonth]} ${selectedYear}</p>
+                        <p class="text-sm mt-2">تأكد من وجود معاملات مسجلة في هذا الشهر</p>
+                    </div>
+                `;
+            } else {
+                // Customer activity section
+                if (Object.keys(customerActivity).length > 0) {
+                    reportHTML += `
+                        <div class="mb-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">نشاط العملاء (${Object.keys(customerActivity).length} عميل)</h4>
+                            <div class="space-y-3 max-h-64 overflow-y-auto">
+                    `;
+                    
+                    Object.keys(customerActivity).forEach(code => {
+                        const activity = customerActivity[code];
+                        const netAmount = activity.debt - activity.payments;
+                        
+                        reportHTML += `
+                            <div class="border border-gray-200 rounded-lg p-3">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h5 class="font-semibold">${activity.name} (${code})</h5>
+                                    <span class="text-sm font-bold ${netAmount >= 0 ? 'text-red-600' : 'text-green-600'}">
+                                        ${netAmount.toFixed(2)} جنيه
+                                    </span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2 text-sm">
+                                    <div class="text-center">
+                                        <p class="text-gray-600">مديونيات</p>
+                                        <p class="font-semibold text-red-600">${activity.debt.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div class="text-center">
+                                        <p class="text-gray-600">مدفوعات</p>
+                                        <p class="font-semibold text-green-600">${activity.payments.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div class="text-center">
+                                        <p class="text-gray-600">معاملات</p>
+                                        <p class="font-semibold text-blue-600">${activity.transactions.length}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    reportHTML += `</div></div>`;
+                }
+                
+                // Detailed transactions
+                reportHTML += `
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">تفاصيل المعاملات</h4>
+                        <div class="space-y-2 max-h-64 overflow-y-auto">
+                `;
+                
+                // Sort transactions by date (newest first)
+                const sortedTransactions = [...monthlyTransactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                sortedTransactions.forEach(transaction => {
+                    const typeIcon = transaction.type === 'debt' ? '💸' : '💚';
+                    const typeText = transaction.type === 'debt' ? 'مديونية' : 'دفعة';
+                    const amountColor = transaction.type === 'debt' ? 'text-red-600' : 'text-green-600';
+                    
+                    reportHTML += `
+                        <div class="border border-gray-200 rounded p-3 text-sm">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-2">
+                                    <span>${typeIcon}</span>
+                                    <span class="font-medium">${transaction.customerName} (${transaction.customerCode})</span>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold ${amountColor}">${transaction.amount.toFixed(2)} جنيه</p>
+                                    <p class="text-xs text-gray-500">${new Date(transaction.date).toLocaleDateString('ar-EG')}</p>
+                                </div>
+                            </div>
+                            ${transaction.description ? `<p class="text-gray-600 mt-1 text-xs">${transaction.description}</p>` : ''}
+                        </div>
+                    `;
+                });
+                
+                reportHTML += `</div></div>`;
+            }
+            
+            document.getElementById('monthlyReportContent').innerHTML = reportHTML;
+            showSuccessMessage(`تم إنشاء تقرير ${monthNames[selectedMonth]} ${selectedYear} بنجاح!`);
+        }
+
+        function printCurrentReport() {
+            const reportContent = document.getElementById('monthlyReportContent');
+            
+            if (!reportContent.innerHTML.includes('تقرير')) {
+                alert('يرجى إنشاء تقرير أولاً قبل الطباعة');
+                return;
+            }
+            
+            printMonthlyReport();
+        }
+
+        function printMonthlyReport() {
+            const reportContent = document.getElementById('monthlyReportContent');
+            const month = parseInt(document.getElementById('reportMonth').value);
+            const year = parseInt(document.getElementById('reportYear').value);
+            
+            const monthNames = [
+                '', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+            ];
+            
+            if (!reportContent.innerHTML.includes('تقرير')) {
+                alert('يرجى إنشاء التقرير أولاً');
+                return;
+            }
+            
+            // Get monthly transactions for detailed report
+            const monthlyTransactions = transactions.filter(transaction => {
+                const transactionDate = new Date(transaction.date);
+                const transactionMonth = transactionDate.getMonth() + 1;
+                const transactionYear = transactionDate.getFullYear();
+                return transactionMonth === month && transactionYear === year;
+            });
+            
+            // Calculate statistics
+            let totalDebt = 0;
+            let totalPayments = 0;
+            const customerActivity = {};
+            
+            monthlyTransactions.forEach(transaction => {
+                if (transaction.type === 'debt') {
+                    totalDebt += transaction.amount;
+                } else if (transaction.type === 'payment') {
+                    totalPayments += transaction.amount;
+                }
+                
+                if (!customerActivity[transaction.customerCode]) {
+                    customerActivity[transaction.customerCode] = {
+                        name: transaction.customerName,
+                        debt: 0,
+                        payments: 0,
+                        transactions: []
+                    };
+                }
+                
+                customerActivity[transaction.customerCode].transactions.push(transaction);
+                if (transaction.type === 'debt') {
+                    customerActivity[transaction.customerCode].debt += transaction.amount;
+                } else {
+                    customerActivity[transaction.customerCode].payments += transaction.amount;
+                }
+            });
+            
+            const netMovement = totalDebt - totalPayments;
+            const transactionCount = monthlyTransactions.length;
+            const activeCustomers = Object.keys(customerActivity).length;
+            
+            // Calculate percentages and insights
+            const debtPercentage = totalPayments > 0 ? ((totalDebt / totalPayments) * 100).toFixed(1) : 0;
+            const paymentPercentage = totalDebt > 0 ? ((totalPayments / totalDebt) * 100).toFixed(1) : 0;
+            
+            const printWindow = window.open('', '_blank');
+            const printContent = `
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>تقرير ${monthNames[month]} ${year} - نظام إدارة المديونية</title>
+                    <style>
+                        body {
+                            font-family: 'Arial', 'Tahoma', sans-serif;
+                            margin: 10px;
+                            color: #000;
+                            direction: rtl;
+                            font-size: 11px;
+                            line-height: 1.3;
+                            background: white;
+                        }
+                        
+                        /* Excel-style table formatting */
+                        .excel-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin: 15px 0;
+                            border: 2px solid #000;
+                        }
+                        
+                        .excel-table th {
+                            background: linear-gradient(to bottom, #4472C4, #2F5597);
+                            color: white;
+                            font-weight: bold;
+                            padding: 8px 6px;
+                            border: 1px solid #000;
+                            text-align: center;
+                            font-size: 10px;
+                        }
+                        
+                        .excel-table td {
+                            padding: 6px 8px;
+                            border: 1px solid #000;
+                            text-align: center;
+                            font-size: 10px;
+                        }
+                        
+                        .excel-table .row-number {
+                            background: #D9E2F3;
+                            font-weight: bold;
+                            width: 30px;
+                            text-align: center;
+                        }
+                        
+                        .excel-table .total-row {
+                            background: #FFF2CC;
+                            font-weight: bold;
+                            border-top: 2px solid #000;
+                        }
+                        
+                        .excel-table .subtotal-row {
+                            background: #E2EFDA;
+                            font-weight: bold;
+                        }
+                        
+                        .header-section {
+                            background: linear-gradient(to right, #4472C4, #70AD47);
+                            color: white;
+                            padding: 15px;
+                            margin-bottom: 20px;
+                            border: 2px solid #000;
+                            text-align: center;
+                        }
+                        
+                        .header-section h1 {
+                            margin: 0 0 8px 0;
+                            font-size: 18px;
+                            font-weight: bold;
+                        }
+                        
+                        .header-section p {
+                            margin: 3px 0;
+                            font-size: 12px;
+                        }
+                        
+                        .summary-grid {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 10px;
+                            margin: 15px 0;
+                        }
+                        
+                        .summary-card {
+                            border: 2px solid #000;
+                            padding: 10px;
+                            text-align: center;
+                            border-radius: 5px;
+                        }
+                        
+                        .summary-card.debt {
+                            background: linear-gradient(to bottom, #FFE6E6, #FFCCCC);
+                        }
+                        
+                        .summary-card.payment {
+                            background: linear-gradient(to bottom, #E6F7E6, #CCEECC);
+                        }
+                        
+                        .summary-card.net {
+                            background: linear-gradient(to bottom, #E6F3FF, #CCE7FF);
+                        }
+                        
+                        .summary-card.count {
+                            background: linear-gradient(to bottom, #FFF0E6, #FFE1CC);
+                        }
+                        
+                        .summary-card h3 {
+                            margin: 0 0 5px 0;
+                            font-size: 10px;
+                            color: #333;
+                        }
+                        
+                        .summary-card .value {
+                            font-size: 14px;
+                            font-weight: bold;
+                            margin: 5px 0;
+                        }
+                        
+                        .summary-card .percentage {
+                            font-size: 9px;
+                            color: #666;
+                        }
+                        
+                        .debt-value { color: #C5504B; }
+                        .payment-value { color: #70AD47; }
+                        .net-positive { color: #C5504B; }
+                        .net-negative { color: #70AD47; }
+                        .count-value { color: #4472C4; }
+                        
+                        .section-title {
+                            background: linear-gradient(to right, #4472C4, #70AD47);
+                            color: white;
+                            padding: 8px 15px;
+                            margin: 20px 0 10px 0;
+                            font-weight: bold;
+                            font-size: 12px;
+                            border: 1px solid #000;
+                        }
+                        
+                        .insights-box {
+                            background: #F8F9FA;
+                            border: 2px solid #4472C4;
+                            padding: 10px;
+                            margin: 15px 0;
+                            border-radius: 5px;
+                        }
+                        
+                        .insights-box h4 {
+                            color: #4472C4;
+                            margin: 0 0 8px 0;
+                            font-size: 11px;
+                        }
+                        
+                        .insights-box ul {
+                            margin: 0;
+                            padding-right: 15px;
+                            font-size: 10px;
+                        }
+                        
+                        .insights-box li {
+                            margin-bottom: 3px;
+                        }
+                        
+                        .footer-section {
+                            margin-top: 30px;
+                            text-align: center;
+                            font-size: 9px;
+                            color: #666;
+                            border-top: 2px solid #000;
+                            padding-top: 10px;
+                            background: #F8F9FA;
+                        }
+                        
+                        .page-break {
+                            page-break-before: always;
+                        }
+                        
+                        @media print {
+                            body { margin: 0; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <!-- Header Section -->
+                    <div class="header-section">
+                        <h1>💰 نظام إدارة مديونية العملاء - فرع الساحل</h1>
+                        <p><strong>التقرير الشهري التفصيلي - ${monthNames[month]} ${year}</strong></p>
+                        <p>تاريخ الإنشاء: ${new Date().toLocaleString('ar-EG')} | الإصدار 7.1</p>
+                    </div>
+                    
+                    <!-- Executive Summary -->
+                    <div class="section-title">📊 الملخص التنفيذي والإحصائيات الرئيسية</div>
+                    
+                    <div class="summary-grid">
+                        <div class="summary-card debt">
+                            <h3>💸 إجمالي المديونيات الجديدة</h3>
+                            <div class="value debt-value">${totalDebt.toFixed(2)} جنيه</div>
+                            <div class="percentage">نسبة للمدفوعات: ${debtPercentage}%</div>
+                        </div>
+                        
+                        <div class="summary-card payment">
+                            <h3>💚 إجمالي المدفوعات المحصلة</h3>
+                            <div class="value payment-value">${totalPayments.toFixed(2)} جنيه</div>
+                            <div class="percentage">نسبة تحصيل: ${paymentPercentage}%</div>
+                        </div>
+                        
+                        <div class="summary-card net">
+                            <h3>📈 صافي الحركة المالية</h3>
+                            <div class="value ${netMovement >= 0 ? 'net-positive' : 'net-negative'}">${netMovement.toFixed(2)} جنيه</div>
+                            <div class="percentage">${netMovement >= 0 ? 'زيادة في المديونية' : 'تحسن في التحصيل'}</div>
+                        </div>
+                        
+                        <div class="summary-card count">
+                            <h3>📋 إجمالي المعاملات</h3>
+                            <div class="value count-value">${transactionCount} معاملة</div>
+                            <div class="percentage">${activeCustomers} عميل نشط</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Key Insights -->
+                    <div class="insights-box">
+                        <h4>🔍 الملاحظات والتحليلات الرئيسية:</h4>
+                        <ul>
+                            <li><strong>معدل النشاط:</strong> ${(transactionCount / 30).toFixed(1)} معاملة يومياً في المتوسط</li>
+                            <li><strong>متوسط قيمة المديونية:</strong> ${activeCustomers > 0 ? (totalDebt / Math.max(monthlyTransactions.filter(t => t.type === 'debt').length, 1)).toFixed(2) : 0} جنيه للمعاملة</li>
+                            <li><strong>متوسط قيمة الدفعة:</strong> ${activeCustomers > 0 ? (totalPayments / Math.max(monthlyTransactions.filter(t => t.type === 'payment').length, 1)).toFixed(2) : 0} جنيه للمعاملة</li>
+                            <li><strong>كفاءة التحصيل:</strong> ${paymentPercentage}% من المديونيات تم تحصيلها</li>
+                            ${netMovement > 0 ? '<li><strong>تنبيه:</strong> هناك زيادة في المديونيات المستحقة تتطلب متابعة</li>' : '<li><strong>إيجابي:</strong> تحسن ملحوظ في معدلات التحصيل</li>'}
+                        </ul>
+                    </div>
+                    
+                    ${activeCustomers > 0 ? `
+                    <!-- Customer Activity Table -->
+                    <div class="section-title">👥 تفاصيل نشاط العملاء (${activeCustomers} عميل نشط)</div>
+                    
+                    <table class="excel-table">
+                        <thead>
+                            <tr>
+                                <th class="row-number">#</th>
+                                <th>كود العميل</th>
+                                <th>اسم العميل</th>
+                                <th>المديونيات الجديدة</th>
+                                <th>المدفوعات المحصلة</th>
+                                <th>صافي الحركة</th>
+                                <th>عدد المعاملات</th>
+                                <th>الحالة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.keys(customerActivity).map((code, index) => {
+                                const activity = customerActivity[code];
+                                const netAmount = activity.debt - activity.payments;
+                                const status = netAmount > 0 ? 'مديون' : netAmount < 0 ? 'دائن' : 'متوازن';
+                                const statusColor = netAmount > 0 ? 'debt-value' : netAmount < 0 ? 'payment-value' : 'count-value';
+                                
+                                return `
+                                    <tr>
+                                        <td class="row-number">${index + 1}</td>
+                                        <td>${code}</td>
+                                        <td style="text-align: right;">${activity.name}</td>
+                                        <td class="debt-value">${activity.debt.toFixed(2)}</td>
+                                        <td class="payment-value">${activity.payments.toFixed(2)}</td>
+                                        <td class="${statusColor}">${netAmount.toFixed(2)}</td>
+                                        <td>${activity.transactions.length}</td>
+                                        <td class="${statusColor}">${status}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="3"><strong>الإجماليات</strong></td>
+                                <td class="debt-value"><strong>${totalDebt.toFixed(2)}</strong></td>
+                                <td class="payment-value"><strong>${totalPayments.toFixed(2)}</strong></td>
+                                <td class="${netMovement >= 0 ? 'debt-value' : 'payment-value'}"><strong>${netMovement.toFixed(2)}</strong></td>
+                                <td><strong>${transactionCount}</strong></td>
+                                <td><strong>${activeCustomers} عميل</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    ` : ''}
+                    
+                    ${monthlyTransactions.length > 0 ? `
+                    <!-- Detailed Transactions -->
+                    <div class="page-break"></div>
+                    <div class="section-title">📋 سجل المعاملات التفصيلي (${monthlyTransactions.length} معاملة)</div>
+                    
+                    <table class="excel-table">
+                        <thead>
+                            <tr>
+                                <th class="row-number">#</th>
+                                <th>التاريخ</th>
+                                <th>الوقت</th>
+                                <th>كود العميل</th>
+                                <th>اسم العميل</th>
+                                <th>نوع المعاملة</th>
+                                <th>المبلغ (جنيه)</th>
+                                <th>الوصف</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${monthlyTransactions.sort((a, b) => new Date(a.date) - new Date(b.date)).map((transaction, index) => {
+                                const date = new Date(transaction.date);
+                                const typeText = transaction.type === 'debt' ? 'مديونية' : 'دفعة';
+                                const typeClass = transaction.type === 'debt' ? 'debt-value' : 'payment-value';
+                                const typeIcon = transaction.type === 'debt' ? '💸' : '💚';
+                                
+                                return `
+                                    <tr>
+                                        <td class="row-number">${index + 1}</td>
+                                        <td>${date.toLocaleDateString('ar-EG')}</td>
+                                        <td>${date.toLocaleTimeString('ar-EG', {hour: '2-digit', minute: '2-digit'})}</td>
+                                        <td>${transaction.customerCode}</td>
+                                        <td style="text-align: right;">${transaction.customerName}</td>
+                                        <td class="${typeClass}">${typeIcon} ${typeText}</td>
+                                        <td class="${typeClass}"><strong>${transaction.amount.toFixed(2)}</strong></td>
+                                        <td style="text-align: right; font-size: 9px;">${transaction.description || '-'}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr class="subtotal-row">
+                                <td colspan="6"><strong>إجمالي المديونيات</strong></td>
+                                <td class="debt-value"><strong>${totalDebt.toFixed(2)}</strong></td>
+                                <td></td>
+                            </tr>
+                            <tr class="subtotal-row">
+                                <td colspan="6"><strong>إجمالي المدفوعات</strong></td>
+                                <td class="payment-value"><strong>${totalPayments.toFixed(2)}</strong></td>
+                                <td></td>
+                            </tr>
+                            <tr class="total-row">
+                                <td colspan="6"><strong>صافي الحركة</strong></td>
+                                <td class="${netMovement >= 0 ? 'debt-value' : 'payment-value'}"><strong>${netMovement.toFixed(2)}</strong></td>
+                                <td><strong>${transactionCount} معاملة</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    ` : `
+                    <div class="insights-box">
+                        <h4>📅 لا توجد معاملات في ${monthNames[month]} ${year}</h4>
+                        <ul>
+                            <li>لم يتم تسجيل أي معاملات مالية خلال هذا الشهر</li>
+                            <li>تأكد من وجود معاملات مسجلة في النظام لهذه الفترة</li>
+                            <li>يمكن مراجعة الأشهر الأخرى أو إضافة معاملات جديدة</li>
+                        </ul>
+                    </div>
+                    `}
+                    
+                    <!-- Footer -->
+                    <div class="footer-section">
+                        <p><strong>تم إنشاء هذا التقرير بواسطة نظام إدارة مديونية العملاء - الإصدار 7.1</strong></p>
+                        <p>فرع الساحل | © 2025 جميع الحقوق محفوظة | تاريخ الطباعة: ${new Date().toLocaleString('ar-EG')}</p>
+                        <p>هذا التقرير سري ومخصص للاستخدام الداخلي فقط</p>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+            
+            showSuccessMessage('تم فتح التقرير المطبوع بتصميم Excel المحترف');
+        }
+
+        function createBackup() {
+            const backupData = {
+                customers: customers,
+                transactions: transactions,
+                backupDate: new Date().toISOString(),
+                version: '7.1 - 2025'
+            };
+            
+            const dataStr = JSON.stringify(backupData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `نسخة_احتياطية_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            localStorage.setItem('lastBackupDate', new Date().toISOString());
+            hideBackupReminder();
+            
+            showSuccessMessage('تم إنشاء النسخة الاحتياطية بنجاح');
+        }
+
+        function restoreBackup() {
+            const fileInput = document.getElementById('backupFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('يرجى اختيار ملف النسخة الاحتياطية أولاً');
+                return;
+            }
+
+            if (confirm('هل أنت متأكد من استعادة النسخة الاحتياطية؟ سيتم استبدال جميع البيانات الحالية.')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const backupData = JSON.parse(e.target.result);
+                        
+                        if (backupData.customers && backupData.transactions) {
+                            customers = backupData.customers;
+                            transactions = backupData.transactions;
+                            
+                            localStorage.setItem('customersData', JSON.stringify(customers));
+                            localStorage.setItem('transactionsData', JSON.stringify(transactions));
+                            
+                            updateStatistics();
+                            renderCustomersList();
+                            
+                            fileInput.value = '';
+                            showSuccessMessage('تم استعادة النسخة الاحتياطية بنجاح');
+                        } else {
+                            alert('ملف النسخة الاحتياطية غير صحيح');
+                        }
+                    } catch (error) {
+                        alert('خطأ في قراءة ملف النسخة الاحتياطية');
+                        console.error('Backup restore error:', error);
+                    }
+                };
+                
+                reader.readAsText(file);
+            }
+        }
+
+        function exportToExcel() {
+            if (Object.keys(customers).length === 0) {
+                alert('لا توجد بيانات للتصدير');
+                return;
+            }
+
+            showLoading();
+
+            const excelData = [
+                ['تقرير شامل - نظام إدارة مديونية العملاء'],
+                ['تاريخ التصدير: ' + new Date().toLocaleString('ar-EG')],
+                [''],
+                ['كود العميل', 'اسم العميل', 'رقم الهاتف', 'العنوان', 'إجمالي المديونية', 'إجمالي المدفوع', 'الرصيد المتبقي', 'الحالة']
+            ];
+
+            Object.keys(customers).forEach(code => {
+                const customer = customers[code];
+                const status = customer.balance > 0 ? 'مديون' : 'مسدد';
+                
+                excelData.push([
+                    customer.code,
+                    customer.name,
+                    customer.phone || '',
+                    customer.address || '',
+                    customer.totalDebt,
+                    customer.totalPaid,
+                    customer.balance,
+                    status
+                ]);
+            });
+
+            const totalCustomers = Object.keys(customers).length;
+            const totalDebt = Object.values(customers).reduce((sum, c) => sum + c.totalDebt, 0);
+            const totalPaid = Object.values(customers).reduce((sum, c) => sum + c.totalPaid, 0);
+            const debtorCount = Object.values(customers).filter(c => c.balance > 0).length;
+
+            excelData.push(['']);
+            excelData.push(['الملخص الإجمالي']);
+            excelData.push(['إجمالي العملاء', totalCustomers]);
+            excelData.push(['إجمالي المديونيات', totalDebt]);
+            excelData.push(['إجمالي المدفوعات', totalPaid]);
+            excelData.push(['العملاء المديونين', debtorCount]);
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'تقرير العملاء');
+
+            ws['!cols'] = [
+                {wch: 12}, {wch: 20}, {wch: 15}, {wch: 25}, 
+                {wch: 15}, {wch: 15}, {wch: 15}, {wch: 10}
+            ];
+
+            XLSX.writeFile(wb, `تقرير_العملاء_${new Date().toISOString().split('T')[0]}.xlsx`);
+            
+            hideLoading();
+            showSuccessMessage('تم تصدير البيانات إلى Excel بنجاح');
+        }
+
+        function downloadTemplate() {
+            const templateData = [
+                ['كود العميل', 'اسم العميل', 'رقم الهاتف', 'العنوان', 'نوع المعاملة', 'المبلغ', 'الوصف', 'التاريخ'],
+                ['C001', 'أحمد محمد', '01234567890', 'القاهرة', 'debt', '1500', 'فاتورة رقم 001', '2024-01-15'],
+                ['C002', 'فاطمة علي', '01098765432', 'الجيزة', 'debt', '2000', 'مشتريات متنوعة', '2024-01-16'],
+                ['C001', '', '', '', 'payment', '500', 'دفعة جزئية', '2024-01-17'],
+                ['', '', '', '', '', '', '', ''],
+                ['ملاحظات مهمة:', '', '', '', '', '', '', ''],
+                ['- كود العميل: مطلوب لكل معاملة', '', '', '', '', '', '', ''],
+                ['- اسم العميل: مطلوب فقط عند تسجيل عميل جديد', '', '', '', '', '', '', ''],
+                ['- رقم الهاتف والعنوان: اختياري للعملاء الجدد', '', '', '', '', '', '', ''],
+                ['- نوع المعاملة: debt للمديونية، payment للدفعة', '', '', '', '', '', '', ''],
+                ['- المبلغ: أرقام فقط بدون عملة', '', '', '', '', '', '', ''],
+                ['- التاريخ: اختياري، سيتم استخدام التاريخ الحالي إذا ترك فارغاً', '', '', '', '', '', '', '']
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'نموذج المديونية');
+            
+            ws['!cols'] = [
+                {wch: 12}, {wch: 20}, {wch: 15}, {wch: 20},
+                {wch: 15}, {wch: 10}, {wch: 25}, {wch: 15}
+            ];
+
+            XLSX.writeFile(wb, 'نموذج_استيراد_المديونية.xlsx');
+            showSuccessMessage('تم تحميل النموذج بنجاح');
+        }
+
+        function importFromExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('يرجى اختيار ملف Excel أولاً');
+                return;
+            }
+
+            showLoading();
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                    
+                    processExcelData(jsonData);
+                } catch (error) {
+                    hideLoading();
+                    alert('خطأ في قراءة الملف. تأكد من أن الملف صحيح ومن نوع Excel');
+                    console.error('Excel import error:', error);
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processExcelData(data) {
+            if (data.length < 2) {
+                hideLoading();
+                alert('الملف فارغ أو لا يحتوي على بيانات صحيحة');
+                return;
+            }
+
+            let importedCount = 0;
+            let errorCount = 0;
+            const errors = [];
+
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                
+                if (!row || row.length === 0 || !row[0]) continue;
+                
+                const customerCode = String(row[0]).trim().toUpperCase();
+                const customerName = row[1] ? String(row[1]).trim() : '';
+                const customerPhone = row[2] ? String(row[2]).trim() : '';
+                const customerAddress = row[3] ? String(row[3]).trim() : '';
+                const transactionType = row[4] ? String(row[4]).trim().toLowerCase() : '';
+                const amount = row[5] ? parseFloat(row[5]) : 0;
+                const description = row[6] ? String(row[6]).trim() : '';
+                const dateStr = row[7] ? String(row[7]).trim() : '';
+
+                if (!customerCode) {
+                    errors.push(`الصف ${i + 1}: كود العميل مطلوب`);
+                    errorCount++;
+                    continue;
+                }
+
+                if (!customers[customerCode] && customerName) {
+                    customers[customerCode] = {
+                        code: customerCode,
+                        name: customerName,
+                        phone: customerPhone,
+                        address: customerAddress,
+                        totalDebt: 0,
+                        totalPaid: 0,
+                        balance: 0,
+                        createdAt: new Date().toISOString()
+                    };
+                }
+
+                if (transactionType && amount > 0) {
+                    if (!customers[customerCode]) {
+                        errors.push(`الصف ${i + 1}: العميل بكود ${customerCode} غير موجود`);
+                        errorCount++;
+                        continue;
+                    }
+
+                    if (transactionType !== 'debt' && transactionType !== 'payment') {
+                        errors.push(`الصف ${i + 1}: نوع المعاملة يجب أن يكون debt أو payment`);
+                        errorCount++;
+                        continue;
+                    }
+
+                    if (isNaN(amount) || amount <= 0) {
+                        errors.push(`الصف ${i + 1}: المبلغ يجب أن يكون رقم موجب`);
+                        errorCount++;
+                        continue;
+                    }
+
+                    const transaction = {
+                        id: Date.now() + i,
+                        customerCode: customerCode,
+                        customerName: customers[customerCode].name,
+                        type: transactionType,
+                        amount: amount,
+                        description: description,
+                        date: dateStr || new Date().toISOString(),
+                        timestamp: new Date().toLocaleString('ar-EG'),
+                        imported: true
+                    };
+
+                    if (transactionType === 'debt') {
+                        customers[customerCode].totalDebt += amount;
+                        customers[customerCode].balance += amount;
+                    } else if (transactionType === 'payment') {
+                        customers[customerCode].totalPaid += amount;
+                        customers[customerCode].balance -= amount;
+                        if (customers[customerCode].balance < 0) {
+                            customers[customerCode].balance = 0;
+                        }
+                    }
+
+                    transactions.push(transaction);
+                }
+                
+                importedCount++;
+            }
+
+            localStorage.setItem('customersData', JSON.stringify(customers));
+            localStorage.setItem('transactionsData', JSON.stringify(transactions));
+
+            updateStatistics();
+            renderCustomersList();
+            hideLoading();
+
+            document.getElementById('excelFile').value = '';
+
+            let message = `تم استيراد ${importedCount} معاملة بنجاح`;
+            if (errorCount > 0) {
+                message += `\nتم تجاهل ${errorCount} صف بسبب أخطاء`;
+                if (errors.length > 0) {
+                    console.log('Import errors:', errors);
+                    alert(message + '\n\nالأخطاء:\n' + errors.slice(0, 5).join('\n') + 
+                          (errors.length > 5 ? '\n... والمزيد' : ''));
+                } else {
+                    alert(message);
+                }
+            } else {
+                showSuccessMessage(message);
+            }
+        }
+
+        // Customers Management Page Functions
+        function showCustomersPage() {
+            document.getElementById('customersPage').classList.remove('hidden');
+            renderCustomersPage();
+            setupCustomersPageEventListeners();
+        }
+
+        function hideCustomersPage() {
+            document.getElementById('customersPage').classList.add('hidden');
+            selectedCustomers.clear();
+        }
+
+        function setupCustomersPageEventListeners() {
+            document.getElementById('customersPageSearch').addEventListener('input', filterCustomersPage);
+            document.getElementById('customersPageFilter').addEventListener('change', filterCustomersPage);
+            document.getElementById('customersPageSort').addEventListener('change', renderCustomersPage);
+        }
+
+        function renderCustomersPage() {
+            const container = document.getElementById('customersPageList');
+            const customerCodes = Object.keys(customers);
+            
+            if (customerCodes.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-12">
+                        <div class="text-6xl mb-4">👥</div>
+                        <p class="text-xl">لا توجد بيانات عملاء حتى الآن</p>
+                        <p class="text-sm mt-2">ابدأ بإضافة عميل جديد من الصفحة الرئيسية</p>
+                    </div>
+                `;
+                updateCustomersPageStats();
+                return;
+            }
+
+            const sortBy = document.getElementById('customersPageSort').value;
+            customerCodes.sort((a, b) => {
+                const customerA = customers[a];
+                const customerB = customers[b];
+                
+                switch(sortBy) {
+                    case 'name':
+                        return customerA.name.localeCompare(customerB.name, 'ar');
+                    case 'code':
+                        return customerA.code.localeCompare(customerB.code);
+                    case 'balance':
+                        return customerB.balance - customerA.balance;
+                    case 'date':
+                        return new Date(customerB.createdAt) - new Date(customerA.createdAt);
+                    default:
+                        return 0;
+                }
+            });
+
+            const customersHTML = customerCodes.map(code => {
+                const customer = customers[code];
+                const statusColor = customer.balance > 0 ? 'text-red-600' : 'text-green-600';
+                const statusIcon = customer.balance > 0 ? '⚠️' : '✅';
+                const statusText = customer.balance > 0 ? 'مديون' : 'مسدد';
+                const isSelected = selectedCustomers.has(code);
+
+                return `
+                    <div class="customer-card border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 ${isSelected ? 'bg-blue-50 border-blue-300' : ''}" 
+                         data-code="${code}" data-name="${customer.name.toLowerCase()}" data-balance="${customer.balance}">
+                        <div class="flex items-start gap-4">
+                            <div class="flex items-center pt-1">
+                                <input type="checkbox" id="customer_${code}" 
+                                       class="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                       ${isSelected ? 'checked' : ''}
+                                       onchange="toggleCustomerSelection('${code}')">
+                            </div>
+                            
+                            <div class="flex-1">
+                                <div class="flex items-center gap-3 mb-3">
+                                    <h3 class="text-lg font-semibold text-gray-800">${customer.name}</h3>
+                                    <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">${customer.code}</span>
+                                    <span class="${statusColor} text-lg">${statusIcon}</span>
+                                </div>
+                                
+                                ${customer.phone ? `<p class="text-sm text-gray-600 mb-1 flex items-center"><span class="ml-2">📞</span>${customer.phone}</p>` : ''}
+                                ${customer.address ? `<p class="text-sm text-gray-600 mb-3 flex items-center"><span class="ml-2">📍</span>${customer.address}</p>` : ''}
+                                
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div class="text-center bg-red-50 rounded-lg p-2">
+                                        <p class="text-gray-600 text-xs">إجمالي المديونية</p>
+                                        <p class="font-bold text-red-600">${customer.totalDebt.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div class="text-center bg-green-50 rounded-lg p-2">
+                                        <p class="text-gray-600 text-xs">إجمالي المدفوع</p>
+                                        <p class="font-bold text-green-600">${customer.totalPaid.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div class="text-center bg-gray-50 rounded-lg p-2">
+                                        <p class="text-gray-600 text-xs">الرصيد المتبقي</p>
+                                        <p class="font-bold ${statusColor}">${customer.balance.toFixed(2)} جنيه</p>
+                                    </div>
+                                    <div class="text-center bg-blue-50 rounded-lg p-2">
+                                        <p class="text-gray-600 text-xs">الحالة</p>
+                                        <p class="font-bold ${statusColor}">${statusText}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col gap-2">
+                                <button onclick="showCustomerHistory('${code}')" 
+                                        class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm transition duration-200 flex items-center">
+                                    <span class="ml-1">📊</span>
+                                    السجل
+                                </button>
+                                <button onclick="deleteCustomerFromPage('${code}')" 
+                                        class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-sm transition duration-200 flex items-center">
+                                    <span class="ml-1">🗑️</span>
+                                    حذف
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = customersHTML;
+            updateCustomersPageStats();
+        }
+
+        function toggleCustomerSelection(customerCode) {
+            if (selectedCustomers.has(customerCode)) {
+                selectedCustomers.delete(customerCode);
+            } else {
+                selectedCustomers.add(customerCode);
+            }
+            
+            updateSelectedCount();
+            updateCustomerCardAppearance(customerCode);
+        }
+
+        function updateCustomerCardAppearance(customerCode) {
+            const card = document.querySelector(`[data-code="${customerCode}"]`);
+            const checkbox = document.getElementById(`customer_${customerCode}`);
+            
+            if (selectedCustomers.has(customerCode)) {
+                card.classList.add('bg-blue-50', 'border-blue-300');
+                checkbox.checked = true;
+            } else {
+                card.classList.remove('bg-blue-50', 'border-blue-300');
+                checkbox.checked = false;
+            }
+        }
+
+        function selectAllCustomers() {
+            const visibleCards = document.querySelectorAll('.customer-card:not([style*="display: none"])');
+            visibleCards.forEach(card => {
+                const customerCode = card.getAttribute('data-code');
+                selectedCustomers.add(customerCode);
+                updateCustomerCardAppearance(customerCode);
+            });
+            updateSelectedCount();
+        }
+
+        function deselectAllCustomers() {
+            selectedCustomers.clear();
+            document.querySelectorAll('.customer-card').forEach(card => {
+                const customerCode = card.getAttribute('data-code');
+                updateCustomerCardAppearance(customerCode);
+            });
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = selectedCustomers.size;
+            document.getElementById('selectedCount').textContent = count;
+            document.getElementById('customersPageSelectedCount').textContent = count;
+        }
+
+        function updateCustomersPageStats() {
+            const customerCodes = Object.keys(customers);
+            const totalCount = customerCodes.length;
+            let debtorCount = 0;
+            let clearedCount = 0;
+
+            customerCodes.forEach(code => {
+                const customer = customers[code];
+                if (customer.balance > 0) {
+                    debtorCount++;
+                } else {
+                    clearedCount++;
+                }
+            });
+
+            document.getElementById('customersPageTotalCount').textContent = totalCount;
+            document.getElementById('customersPageDebtorCount').textContent = debtorCount;
+            document.getElementById('customersPageClearedCount').textContent = clearedCount;
+        }
+
+        function filterCustomersPage() {
+            const searchTerm = document.getElementById('customersPageSearch').value.toLowerCase();
+            const filterValue = document.getElementById('customersPageFilter').value;
+            
+            const customerCards = document.querySelectorAll('.customer-card');
+            
+            customerCards.forEach(card => {
+                const customerName = card.getAttribute('data-name');
+                const customerCode = card.getAttribute('data-code').toLowerCase();
+                const balance = parseFloat(card.getAttribute('data-balance'));
+                
+                let showCard = true;
+                
+                if (searchTerm && !customerName.includes(searchTerm) && !customerCode.includes(searchTerm)) {
+                    showCard = false;
+                }
+                
+                if (filterValue === 'debtors' && balance <= 0) {
+                    showCard = false;
+                } else if (filterValue === 'cleared' && balance > 0) {
+                    showCard = false;
+                }
+                
+                card.style.display = showCard ? 'block' : 'none';
+            });
+        }
+
+        function deleteCustomerFromPage(customerCode) {
+            const customer = customers[customerCode];
+            if (confirm(`هل أنت متأكد من حذف العميل "${customer.name}" (${customerCode}) وجميع معاملاته؟`)) {
+                delete customers[customerCode];
+                transactions = transactions.filter(t => t.customerCode !== customerCode && t.customerName !== customer.name);
+                
+                localStorage.setItem('customersData', JSON.stringify(customers));
+                localStorage.setItem('transactionsData', JSON.stringify(transactions));
+                
+                selectedCustomers.delete(customerCode);
+                updateStatistics();
+                renderCustomersPage();
+                showSuccessMessage('تم حذف العميل بنجاح');
+            }
+        }
+
+        function deleteSelectedCustomers() {
+            if (selectedCustomers.size === 0) {
+                alert('يرجى تحديد عملاء للحذف أولاً');
+                return;
+            }
+
+            if (confirm(`هل أنت متأكد من حذف ${selectedCustomers.size} عميل وجميع معاملاتهم؟\n\nهذا الإجراء لا يمكن التراجع عنه!`)) {
+                showLoading();
+                
+                selectedCustomers.forEach(customerCode => {
+                    delete customers[customerCode];
+                    transactions = transactions.filter(t => t.customerCode !== customerCode);
+                });
+                
+                localStorage.setItem('customersData', JSON.stringify(customers));
+                localStorage.setItem('transactionsData', JSON.stringify(transactions));
+                
+                const deletedCount = selectedCustomers.size;
+                selectedCustomers.clear();
+                
+                updateStatistics();
+                renderCustomersPage();
+                hideLoading();
+                showSuccessMessage(`تم حذف ${deletedCount} عميل بنجاح`);
+            }
+        }
+
+        function exportSelectedCustomers() {
+            if (selectedCustomers.size === 0) {
+                alert('يرجى تحديد عملاء للتصدير أولاً');
+                return;
+            }
+
+            showLoading();
+
+            const excelData = [
+                ['تقرير العملاء المحددين - نظام إدارة مديونية العملاء'],
+                ['تاريخ التصدير: ' + new Date().toLocaleString('ar-EG')],
+                ['عدد العملاء المحددين: ' + selectedCustomers.size],
+                [''],
+                ['كود العميل', 'اسم العميل', 'رقم الهاتف', 'العنوان', 'إجمالي المديونية', 'إجمالي المدفوع', 'الرصيد المتبقي', 'الحالة']
+            ];
+
+            selectedCustomers.forEach(code => {
+                const customer = customers[code];
+                const status = customer.balance > 0 ? 'مديون' : 'مسدد';
+                
+                excelData.push([
+                    customer.code,
+                    customer.name,
+                    customer.phone || '',
+                    customer.address || '',
+                    customer.totalDebt,
+                    customer.totalPaid,
+                    customer.balance,
+                    status
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'العملاء المحددين');
+
+            ws['!cols'] = [
+                {wch: 12}, {wch: 20}, {wch: 15}, {wch: 25}, 
+                {wch: 15}, {wch: 15}, {wch: 15}, {wch: 10}
+            ];
+
+            XLSX.writeFile(wb, `العملاء_المحددين_${new Date().toISOString().split('T')[0]}.xlsx`);
+            
+            hideLoading();
+            showSuccessMessage(`تم تصدير ${selectedCustomers.size} عميل إلى Excel بنجاح`);
+        }
+
+        function printSelectedCustomers() {
+            if (selectedCustomers.size === 0) {
+                alert('يرجى تحديد عملاء للطباعة أولاً');
+                return;
+            }
+
+            const printWindow = window.open('', '_blank');
+            let printContent = `
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>قائمة العملاء المحددين - نظام إدارة المديونية</title>
+                    <style>
+                        body {
+                            font-family: 'Arial', sans-serif;
+                            margin: 20px;
+                            color: #333;
+                            direction: rtl;
+                        }
+                        .header {
+                            text-align: center;
+                            border-bottom: 2px solid #333;
+                            padding-bottom: 20px;
+                            margin-bottom: 30px;
+                        }
+                        .header h1 {
+                            color: #2563eb;
+                            margin: 0;
+                            font-size: 24px;
+                        }
+                        .customer {
+                            border: 1px solid #ddd;
+                            margin-bottom: 15px;
+                            padding: 15px;
+                            border-radius: 8px;
+                            page-break-inside: avoid;
+                        }
+                        .customer h3 {
+                            margin: 0 0 10px 0;
+                            color: #333;
+                            font-size: 18px;
+                        }
+                        .customer-info {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 10px;
+                            margin-top: 10px;
+                        }
+                        .info-item {
+                            text-align: center;
+                            padding: 8px;
+                            border: 1px solid #eee;
+                            border-radius: 4px;
+                        }
+                        .info-item p {
+                            margin: 0;
+                            font-size: 12px;
+                            color: #666;
+                        }
+                        .info-item .value {
+                            font-weight: bold;
+                            font-size: 14px;
+                            margin-top: 5px;
+                        }
+                        .red { color: #dc2626; }
+                        .green { color: #16a34a; }
+                        .footer {
+                            margin-top: 40px;
+                            text-align: center;
+                            font-size: 12px;
+                            color: #666;
+                            border-top: 1px solid #ddd;
+                            padding-top: 20px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>👥 قائمة العملاء المحددين</h1>
+                        <p>نظام إدارة مديونية العملاء - فرع الساحل</p>
+                        <p>تاريخ الطباعة: ${new Date().toLocaleString('ar-EG')}</p>
+                        <p>عدد العملاء: ${selectedCustomers.size}</p>
+                    </div>
+            `;
+
+            selectedCustomers.forEach(code => {
+                const customer = customers[code];
+                const statusColor = customer.balance > 0 ? 'red' : 'green';
+                const statusText = customer.balance > 0 ? 'مديون' : 'مسدد';
+
+                printContent += `
+                    <div class="customer">
+                        <h3>${customer.name} (${customer.code})</h3>
+                        ${customer.phone ? `<p>📞 ${customer.phone}</p>` : ''}
+                        ${customer.address ? `<p>📍 ${customer.address}</p>` : ''}
+                        
+                        <div class="customer-info">
+                            <div class="info-item">
+                                <p>إجمالي المديونية</p>
+                                <div class="value red">${customer.totalDebt.toFixed(2)} جنيه</div>
+                            </div>
+                            <div class="info-item">
+                                <p>إجمالي المدفوع</p>
+                                <div class="value green">${customer.totalPaid.toFixed(2)} جنيه</div>
+                            </div>
+                            <div class="info-item">
+                                <p>الرصيد المتبقي</p>
+                                <div class="value ${statusColor}">${customer.balance.toFixed(2)} جنيه</div>
+                            </div>
+                            <div class="info-item">
+                                <p>الحالة</p>
+                                <div class="value ${statusColor}">${statusText}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            printContent += `
+                    <div class="footer">
+                        <p>تم إنشاء هذا التقرير بواسطة نظام إدارة مديونية العملاء - الإصدار 7.1</p>
+                        <p>© 2025 جميع الحقوق محفوظة</p>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+            
+            showSuccessMessage(`تم فتح نافذة طباعة ${selectedCustomers.size} عميل`);
+        }
+
+        function showSuccessMessage(message) {
+            const messageEl = document.getElementById('successMessage');
+            const textEl = document.getElementById('successText');
+            
+            textEl.textContent = message;
+            messageEl.classList.remove('hidden');
+            messageEl.classList.add('success-animation');
+            
+            setTimeout(() => {
+                messageEl.classList.add('hidden');
+                messageEl.classList.remove('success-animation');
+            }, 3000);
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('historyModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                createBackup();
+            }
+            
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98b63f3a3623a10c',t:'MTc1OTkzMjg5Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
